@@ -1,3 +1,4 @@
+// William Nguyen 260638465 Assignement 1: Shell
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,13 +12,11 @@ pid_t child_pid;
 
 /*Seperate input and set each value into args array
 Determine if special characters such as >,& or | are included and raise flags
-
-input : input in the command prompt
+input : inpuxt in the command prompt
 args:string array to place tokens inside
 background : flag to run command in background
 redirection:flag to redirect output to another location
 pipeStatus : flag to pipe output to another command
-
  */
 
 void getcmd (char* input, char * args[], int *background, int *redirection,int *pipeStatus){
@@ -31,7 +30,6 @@ void getcmd (char* input, char * args[], int *background, int *redirection,int *
                         *redirection = i;
                 }
                 else if (strcmp(args[i], "|") == 0) {
-                        printf("PIPE VALUE IS : %d\n", i);
                         *pipeStatus = i;
                 }
         }
@@ -50,13 +48,11 @@ static void sigHandler(int sig){
 
         if (sig == SIGINT){
                 kill(child_pid,SIGKILL);
-                printf("KILLED PROCESS");
         }
 }
 
 /*
 Place Pid of background job into a list
-
 bgProcessList : array of background Pids
 pid : pid to add to background list
 bgIndex: current index of list
@@ -71,18 +67,17 @@ void addProcessToBg(pid_t *bgProcessList, int pid, int* bgIndex){
 
 /*
 When command is jobs, print the list of background jobs
-
 bgProcessList : list of background jobs
 bgIndex : current index of storage
 */
 
 void printBgJobs(pid_t *bgProcessList, int* bgIndex){
         int i;
-        printf("current jobs in background\n\n");
+        printf("current jobs in background :\n\n");
         for (i = *bgIndex; i >0  ; i--){
                 printf("Job ID %d at : %d\n", bgProcessList[i],i);
                 }
-        
+
 }
 
 /*
@@ -140,59 +135,56 @@ getcmd(input,args, &bg, &redirection,&pipeStatus);
                         perror("cannot access that directory\n");
                 }
         }
-	else if (strcmp(args[0],"\0") == 0) {
-		printf("Command invalid pleae type a new one\n");
-	}
+        else if (strcmp(args[0],"\0") == 0) {
+                printf("Command invalid pleae type a new one\n");
+        }
 
         else if (strcmp(args[0],"exit") == 0) {
                 printf("exiting shell\n");
                 exit(1);
-        } 
- 	else {
-
-        //EXTERNAL COMMANDS
+        }
+        else {
 
         int pid = fork();
-		if (pid < 0){
+                if (pid < 0){
                         perror("child process error");
                 }
                 else if (pid == 0){
-                         printf("child process ID : %d\n", pid);
-                        
-			 if (strcmp(args[0],"pwd") == 0){
-        	         char buffer[maxPath];
-	                 printf("current working directory : %s\n", getcwd(buffer,maxPath));
-			 }
-			
-			 else if (strcmp(args[0],"fg") == 0){
-        	         //ERROR handling
-               		 if (args[1] == NULL || args[1] ==""){
-                       		 perror("there is no argument for fg");
-                	}
-                	printf("switching to the process at index %s\n : ", args[1]);
-                	pid_t newPid = bgProcessList[atoi(args[1])];
-                	printf("NEW PID : %d\n",newPid);
-                	if (newPid > 0){
-                        	printf("new Foreground Process\n");
-                        	kill(newPid,SIGCONT);
-                        	waitpid(newPid, &statusOfProcess, 0);
-                	}
 
-        		}
-        		
-			else if (strcmp(args[0],"jobs") == 0){
-                		printBgJobs(bgProcessList,ptrbgIndex);
-                	}
-		
-			else if (redirection >= 0){
-                                printf("Redirecting command in child\n");
+                         if (strcmp(args[0],"pwd") == 0){
+                         char buffer[maxPath];
+                         printf("current working directory : %s\n", getcwd(buffer,maxPath));
+                         }
+
+                         else if (strcmp(args[0],"fg") == 0){
+                         //ERROR handling
+                         if (args[1] == NULL || args[1] ==""){
+                                 perror("there is no argument for fg");
+                        }
+                        printf("switching to the process at index %s\n : ", args[1]);
+                        pid_t newPid = bgProcessList[atoi(args[1])];
+                        printf("NEW PID : %d\n",newPid);
+                        if (newPid > 0){
+                                printf("new Foreground Process\n");
+                                kill(newPid,SIGCONT);
+                                waitpid(newPid, &statusOfProcess, 0);
+                        }
+
+                        }
+
+                        else if (strcmp(args[0],"jobs") == 0){
+                                printBgJobs(bgProcessList,ptrbgIndex);
+                        }
+
+                        else if (redirection >= 0){
+
                                 close(1);
                                 int  fd  = open(args[redirection + 1],O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
                                 removeArgs(args,redirection);
-				execvp(args[0],args);
+                                execvp(args[0],args);
                         }
                         else if(pipeStatus >= 0){
-                                printf("Piping first command as out\n");
+
                                 int pfd[2];
                                 if(pipe(pfd) == -1) {
                                         perror("Pipe error");
@@ -200,59 +192,58 @@ getcmd(input,args, &bg, &redirection,&pipeStatus);
                                 }
                                 int pipedPid = fork();
                                 if (pipedPid == 0){
-                                        printf("this is a children PIPE\n");
+
                                         close(0);
-					dup(pfd[0]);
-				
-					close(pfd[1]);
-					close(pfd[0]);
-					
-					//Arguments for second command when piping
-					int length = sizeof(args)/sizeof(args[0]);
-					int secondLength = length - pipeStatus;
-					char* pipeArgs[secondLength];
-					for(int i =0 ; i< secondLength - 1 ; i++){
-						pipeArgs[i] = args[pipeStatus + 1 + i];
-					}
-					pipeArgs[secondLength] = 0;
-					execvp(pipeArgs[0],pipeArgs);
+                                        dup(pfd[0]);
+
+                                        close(pfd[1]);
+                                        close(pfd[0]);
+
+                                        //Arguments for second command when piping
+                                        int length = sizeof(args)/sizeof(args[0]);
+                                        int secondLength = length - pipeStatus;
+                                        char* pipeArgs[secondLength];
+                                        for(int i =0 ; i< secondLength - 1 ; i++){
+                                                pipeArgs[i] = args[pipeStatus + 1 + i];
+                                        }
+                                        pipeArgs[secondLength] = 0;
+                                        execvp(pipeArgs[0],pipeArgs);
                                 }else{
                                 close(1);
                                 dup(pfd[1]);
-				
-				close(pfd[0]);
-				close(pfd[1]);
-			
-				removeArgs(args,pipeStatus);
-				execvp(args[0],args);
-				}
 
-                        } 
-			else {
+                                close(pfd[0]);
+                                close(pfd[1]);
+
+                                removeArgs(args,pipeStatus);
+                                execvp(args[0],args);
+                                }
+
+                        }
+                        else {
                          execvp(args[0],args);
-			}
+                        }
 
-                  	_exit(EXIT_FAILURE);      
+                        _exit(EXIT_FAILURE);
 
                 }
         else{
 
                 if (bg == 0){
-                        
+
                         child_pid = pid;
                         if (signal(SIGINT, sigHandler) == SIG_ERR){
                                         printf("ERROR! could not bind the signal handler\n");
                                         exit(1);
                         }
-                        //WAIT FOR FINAL TO USE THIS
-                        //if (signal(SIGTSTP,SIG_IGN) == SIG_ERR){
-                        //        printf("ERROR! could not ignore signal\n");
-                        //}
+
+                        if (signal(SIGTSTP,SIG_IGN) == SIG_ERR){
+                                printf("ERROR! could not ignore signal\n");
+                        }
                         waitpid(pid,&statusOfProcess,0);
 
         }
         else {
-                printf("Add process to bg\n");
                 addProcessToBg(bgProcessList,pid,ptrbgIndex);
 
         }
