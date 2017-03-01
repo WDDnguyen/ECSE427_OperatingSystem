@@ -13,19 +13,22 @@
 #include <semaphore.h>
 
 #define SharedMemoryName "/WDDNguyen"
+
 #define keySize 32
 #define valueSize 256
+#define sizeOfRecord 288
 
-#define maximumOfSlots 32
+#define maximumOfRecords 32
+
 
 typedef struct{
-char key[keySize];
-char value[valueSize];
+char key[32];
+char value[256];
 
 }KVpair;
 
 typedef struct {
-int StoreSlots;
+
 
 }SharedValues;
 

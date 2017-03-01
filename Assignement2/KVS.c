@@ -1,7 +1,11 @@
 #include "common.h"
 
 int fd;
-size_t currentSize = 0;
+ 
+size_t currentRecord = 0;
+//size_t keySize = 32;
+//size_t valueSize = 256; 
+//size_t sizeOfRecord = 288;
 
 //SharedValues* sharedMemory;
 
@@ -15,7 +19,7 @@ int kv_store_create(char *smName){
 	return -1;
 	}
 	
-	ftruncate(fd,maximumOfSlots * sizeof(KVpair));
+	ftruncate(fd,maximumOfRecords * sizeof(KVpair));
 	
 	//printf("MEMORY NAME : %s\n", smName);
 	//printf("FILE DESCRIPTION VALUE : %d\n", fd);
@@ -28,7 +32,7 @@ int kv_store_create(char *smName){
 int setSharedMemoryAddress(){
 	
 
-	addressOfSharedMemory = mmap(NULL, maximumOfSlots * sizeof(KVpair) , PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	addressOfSharedMemory = mmap(NULL, maximumOfRecords * sizeof(KVpair) , PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (addressOfSharedMemory == MAP_FAILED){
 		printf("setting mmap() failed\n");
 		return -1;
@@ -39,13 +43,15 @@ int setSharedMemoryAddress(){
 
 int kv_store_write(char *key, char *value){
 
-char concatenatedString[298];
+char concatenatedString[288];
 strcpy(concatenatedString,key);
 strcat(concatenatedString,value);
 
+size_t offset = sizeOfRecord * currentRecord;
 //printf("WRITTING INTO SHARED MEMORY\n"); 
-memcpy(addressOfSharedMemory + currentSize, concatenatedString , strlen(key) + strlen(value));
-currentSize = currentSize + strlen(key) + strlen(value);
+memcpy(addressOfSharedMemory + offset, key , keySize);
+memcpy(addressOfSharedMemory + offset + keySize, value , valueSize); 
+currentRecord = currentRecord + 1;
 
 }
 
@@ -69,8 +75,8 @@ KVpair pair2;
 strcpy(pair1.key,"25");
 strcpy(pair1.value,"256");
 
-strcpy(pair2.key,"52");
-strcpy(pair2.value, "652");
+strcpy(pair2.key,"cake");
+strcpy(pair2.value, "man");
 
 kv_store_create(SharedMemoryName);
 setSharedMemoryAddress();
