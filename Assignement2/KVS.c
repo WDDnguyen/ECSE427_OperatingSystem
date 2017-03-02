@@ -54,6 +54,28 @@ memcpy(addressOfSharedMemory + offset + keySize, value , valueSize);
 currentRecord = currentRecord + 1;
 
 }
+//got to change later
+char* kv_store_read(char *key){
+	char* duplicated;
+	int i = 0;
+	size_t offset = 0;
+	// duplicate string 
+	for (i = 0; i < currentRecord ; i++){
+		offset = offset + sizeOfRecord * i;
+		if( memcmp( addressOfSharedMemory + offset , key, strlen(key))  == 0){
+			printf("SAME KEY at record : %d\n", i);
+				
+				duplicated = addressOfSharedMemory + offset + keySize;
+				//memcpy(duplicated, test, 1);
+				//memcpy(duplicated , addressOfSharedMemory + offset + keySize, 1);
+				return duplicated;
+			}
+			
+		} 
+	
+	return NULL; // if no value of that key 
+
+}
 
 void displayAllSharedMemory(){
 
@@ -72,18 +94,27 @@ int main(int argc, char *argv[]){
 KVpair pair1;
 KVpair pair2;
 
-strcpy(pair1.key,"25");
-strcpy(pair1.value,"256");
+strcpy(pair1.key,"Catherine");
+strcpy(pair1.value,"Portal");
 
 strcpy(pair2.key,"cake");
-strcpy(pair2.value, "man");
+strcpy(pair2.value, "IsALie");
 
 kv_store_create(SharedMemoryName);
 setSharedMemoryAddress();
 kv_store_write(pair1.key , pair1.value);
 kv_store_write(pair2.key , pair2.value);
 
-displayAllSharedMemory();
+char* duplicated1;
+char* duplicated2;
+
+duplicated1 = kv_store_read(pair2.key);
+duplicated2 = kv_store_read(pair1.key);
+
+printf("USING KEY : %s , OBTAINED VALUE : %s\n",pair1.key, duplicated1);
+printf("USING KEY : %s , OBTAINED VALUE : %s\n",pair2.key, duplicated2);
+
+//displayAllSharedMemory();
 
 
 }
