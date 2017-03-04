@@ -29,6 +29,8 @@ char value[256];
 
 typedef struct {
 
+int currentRecord;
+KVpair KVQueue[0];
 
 }SharedValues;
 

@@ -1,14 +1,9 @@
 #include "common.h"
-#include <stddef.h>
+
 int fd;
  
 SM* sharedMemory;
-
-
 //char* str = "THECAKEIFALIE";
-
-//sharedMemory->currentRecord = 0;
-//sharedMemory->cake =3 
 
 int kv_store_create(char *smName){
 	fd = shm_open(smName, O_CREAT | O_RDWR, S_IRWXU);
@@ -17,7 +12,7 @@ int kv_store_create(char *smName){
 	return -1;
 	}
 	
-	ftruncate(fd,sizeof(SM) + maximumOfRecords * sizeof(KVpair));
+	ftruncate(fd,sizeof(SM) + maximumOfRecords * sizeOfRecord);
 
 	
 	//printf("MEMORY NAME : %s\n", smName);
@@ -30,7 +25,7 @@ int kv_store_create(char *smName){
 
 int setSharedMemoryAddress(){
 	
-	sharedMemory = (SM*) mmap(NULL, sizeof(SM) + maximumOfRecords * sizeof(KVpair), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	sharedMemory = (SM*) mmap(NULL, sizeof(SM) + maximumOfRecords * sizeOfRecord, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (sharedMemory == MAP_FAILED){
 		printf("setting mmap() failed\n");
 		return -1;
@@ -41,25 +36,21 @@ int setSharedMemoryAddress(){
 
 int kv_store_write(char *key, char *value){
 
+char concatenatedString[288];
+strcpy(concatenatedString,key);
+strcat(concatenatedString,value);
+
 size_t offset = sizeOfRecord * sharedMemory->currentRecord;
 //printf("CURRENT RECORD TO WRITE IN : %d\n",currentRecord);
 //printf("WRITTING INTO SHARED MEMORY\n"); 
 
 //strcpy(sharedMemory->store[offset], key);
-memcpy( sharedMemory + sizeof(SM) + offset, key, keySize);
-memcpy( sharedMemory + sizeof(SM) + offset + keySize, value , valueSize); 
+memcpy(sharedMemory + sizeof(SM) + offset , key, keySize);
+memcpy(sharedMemory + sizeof(SM) + offset + keySize, value , valueSize); 
+sharedMemory->currentRecord = sharedMemory->currentRecord + 1;
 
-printf("CURRENT RECORD : %d\n",sharedMemory->currentRecord);
-
-//offset = sizeOfRecord * 1;
-//memcpy(sharedMemory + sizeof(*sharedMemory) + offset, key, keySize);
-//memcpy(sharedMemory + sizeof(*sharedMemory) + offset + keySize, value , valueSize);
-
-sharedMemory->currentRecord++;
-
-//printf("FINISH WRITING\n");
 }
-/*
+
 //got to change later
 //POSSIBLE LEAK
 char* kv_store_read(char *key){
@@ -69,10 +60,10 @@ char* kv_store_read(char *key){
 	// duplicate string 
 	for (i = 0; i < sharedMemory->currentRecord ; i++){
 		offset = sizeOfRecord * i;
-		if( memcmp( sharedMemory + offset , key, strlen(key))  == 0){
+		if( memcmp( sharedMemory + sizeof(SM) + offset , key, strlen(key))  == 0){
 			printf("SAME KEY at record : %d\n", i);
 				
-				duplicated = sharedMemory + offset + keySize;
+				duplicated = (char*) (sharedMemory + sizeof(SM) + offset + keySize);
 				//memcpy(duplicated, test, 1);
 				//memcpy(duplicated , sharedMemory + offset + keySize, 1);
 				return duplicated;
@@ -85,6 +76,7 @@ char* kv_store_read(char *key){
 }
 
 // POSSIBLE LEAK
+
 char ** kv_store_read_all(char *key){
 	char** allValuesOfKey = malloc(sizeof(256 * maximumOfRecords));
 	char* value;
@@ -96,14 +88,15 @@ char ** kv_store_read_all(char *key){
 	for ( i = 0; i < sharedMemory->currentRecord ; i++){
 	offset = sizeOfRecord * i;
 	//printf("CURRENT INDEX I : %d\n", i);
-	printf("PRINTING OFFSET VALUE : %zu\n", offset);
+	//printf("PRINTING OFFSET VALUE : %zu\n", offset);
  
-	if (memcmp( sharedMemory + offset, key, strlen(key)) == 0){
+	if (memcmp( sharedMemory + sizeof(SM) +  offset, key, strlen(key)) == 0){
 		printf("SAME KEY AT RECORD : %d\n", i);
-		value = sharedMemory + offset + keySize;
+		value = (char*)  (sharedMemory + sizeof(SM) + offset + keySize);
 		allValuesOfKey[index] = value;
 		index = index + 1;
-		printf("ADDED INTO ALL VALUES\n"); 
+		//printf("THIS IS WHAT IS GOING TO BE RETURNED : %s\n", value);
+		//printf("ADDED INTO ALL VALUES\n"); 
 		
 	}
 
@@ -126,7 +119,7 @@ if (fstat(fd, &s) == -1){
 
 write(STDOUT_FILENO, sharedMemory, s.st_size);
 
- }*/
+ }
 
 int main(int argc, char *argv[]){
 
@@ -146,65 +139,12 @@ strcpy(pair3.value, "NOT A LIE");
 kv_store_create(SharedMemoryName);
 setSharedMemoryAddress();
 
-sharedMemory->currentRecord = 0;
-sharedMemory->cake = 3;
-//sharedMemory->store = malloc(sizeOfRecord * maximumOfRecords);
+//printf("THIS IS WHAT IS WRITTEN IN THE STORE CURRENTLY : %c\n", sharedMemory->store); 
+//printf("This is DATA OF THE STORE CURRENTLY : %c\n", sharedMemory->store + 32);
 
 
+printf("THIS IS THE CURRENT RECORD : %d\n", sharedMemory->currentRecord);
 
-//printf("%s\n", sharedMemory->store); 
-
-//memcpy(sharedMemory, "test", 4);
-
-
-
-//char* base = (char*) sharedMemory;
-//char * b;
-
-//int offset = offsetof(SM,store);
-//b = (base+offset);
-//b = "S";
-
-//printf("%s\n", sharedMemory->store); 
-printf("THIS IS STRUCT CURRENTLY : %d\n", sharedMemory->currentRecord); 
-printf("This is STRUCT  CURRENTLY : %d\n",sharedMemory->cake);
-
-
-kv_store_write(pair2.key , pair2.value);
-//sharedMemory->currentRecord = 1;
-kv_store_write(pair3.key, pair3.value);
-//sharedMemory->currentRecord = 2;
-kv_store_write(pair1.key , pair1.value);
-
-
-printf("This is KEY VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) ));
-printf("This is KEY VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) + 32));
-
-//printf("SIZE OF SHARED MEMORY IN BYTES : %zu\n", sizeof(sharedMemory));
-//printf("SIZE OF SM IN BYTES : %zu\n", sizeof(SM));
-//printf("SIZE OF KVPAIR IN BYTES : %zu\n", sizeof(KVpair));
-
-printf("This is KEY VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) + 288));
-printf("This is KEY VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) + 320));
-
-printf("This is KEY VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) + 576));
-printf("This is KEY VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) + 608));
-
-//char* test1 = sharedMemory->store; 
-//char* test2 = sharedMemory->store + 288;
-//char* test3 = sharedMemory->store + 576;
-
-//printf("VALUE OF FIRST KEY : %s\n", test1);
-//printf("VALUE OF SECOND KEY : %s\n", test2);
-//printf("VALUE OF THIRD KEY : %s\n", test3);
-
-
-//kv_store_write("Catherine", "Portal");
-//kv_store_write("cake", "IsALie");
-//kv_store_write("cake", "NOT A LIE");
-
-
-/*
 char* duplicated1;
 char* duplicated2;
 char* duplicated3;
@@ -224,8 +164,5 @@ for ( i = 0 ; i < 2; i++){
 printf("USING KEY : %s, VALUE FOR A KEY IS : %s\n", pair3.key, sameKey[i]); 
 }
 
-*/
-
 //displayAllSharedMemory();
-
 }
