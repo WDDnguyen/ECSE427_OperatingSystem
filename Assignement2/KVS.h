@@ -12,7 +12,7 @@
 
 #include <semaphore.h>
 
-#define SharedMemoryName "/WDDNGUYEN"
+#define SharedMemoryName "/WN"
 
 #define keySize 32
 #define valueSize 256

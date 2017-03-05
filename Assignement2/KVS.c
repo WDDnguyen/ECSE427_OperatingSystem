@@ -41,12 +41,10 @@ for (counter = 0; word[counter] != '\0'; counter++){
 	return hashAddress % numberOfPods < 0 ? -hashAddress % numberOfPods : hashAddress % numberOfPods;
 }
 
+//MIGHT NEED TO IGNORE DUPLICATE KV
 int kv_store_write(char *key, char *value){
 
-
-
 int podIndex = hashFunction(key);
-
 
 //printf("POD VALUE : %d\n", podSpace);
 
@@ -61,14 +59,22 @@ size_t podLocation = podSpace * podIndex;
 //size_t location = sizeof(SM) + offset + podLocation;
 
 //printf("LOCATION TO WRITE : %zu\n", location);
-memcpy( sharedMemory + sizeof(SM) + offset + podLocation, key, keySize);
-memcpy( sharedMemory + sizeof(SM) + offset + podLocation + keySize, value , valueSize); 
 
+memcpy(sharedMemory + sizeof(SM) + offset + podLocation, key, keySize);
+memcpy(sharedMemory + sizeof(SM) + offset + podLocation + keySize, value , valueSize); 
 
+//FIFO Strategy
+// MIGHT NEED TO cHANGE A BIT
+if (sharedMemory->podCounters[podIndex] == podSize - 1){
+printf("FIFO PRESENT THEN RESET COUNTER\n");
+sharedMemory->podCounters[podIndex] = 0;
+}
+else {
+printf("WROTE THE KV in POD : %d AT LOCATION : %d \n", podIndex,sharedMemory->podCounters[podIndex]);
 sharedMemory->podCounters[podIndex]++;
-//sharedMemory->currentRecord++;
+}
 
-printf("WROTE THE KV in POD : %d AT LOCATION : %d \n", podIndex,sharedMemory->podCounters[podIndex] - 1);
+
 }
 
 char* kv_store_read(char *key){
@@ -81,8 +87,8 @@ char* kv_store_read(char *key){
 	size_t offset = sizeOfRecord * i;
 	size_t podLocation = podSpace * podIndex;
 	// duplicate string 
-
-	for (i = 0; i < sharedMemory->podCounters[podIndex] ; i++){
+	//POTENTIALLY CHANGE BACK TO POD COUNTER
+	for (i = 0; i < podSize ; i++){
 		offset = sizeOfRecord * i;
 		if( memcmp( sharedMemory + sizeof(SM) + offset + podLocation , key, strlen(key))  == 0){
 			printf("SAME KEY at record : %d\n", i);
@@ -112,7 +118,8 @@ char ** kv_store_read_all(char *key){
 	int i = 0;
 	size_t offset = 0;
 	//printf("CURRENT RECORD : %d\n", currentRecord);
-	for ( i = 0; i < sharedMemory->podCounters[podIndex] ; i++){
+	//POTENTIALLY CHANGE TO POD COUNTER
+	for ( i = 0; i < podSize ; i++){
 	offset = sizeOfRecord * i;
 	//printf("CURRENT INDEX I : %d\n", i);
 	//printf("PRINTING OFFSET VALUE : %zu\n", offset);
@@ -171,8 +178,14 @@ int main(int argc, char *argv[]){
 KVpair pair1;
 KVpair pair2;
 KVpair pair3;
+KVpair pair4;
+KVpair pair5;
+KVpair pair6;
+KVpair pair7;
+KVpair pair8;
 
-strcpy(pair1.key,"Catherine");
+
+strcpy(pair1.key,"cake");
 strcpy(pair1.value,"Portal");
 
 strcpy(pair2.key,"cake");
@@ -181,13 +194,55 @@ strcpy(pair2.value, "IsALie");
 strcpy(pair3.key,"cake");
 strcpy(pair3.value, "NOT A LIE");
 
+strcpy(pair4.key,"cake");
+strcpy(pair4.value,"Portal");
+
+strcpy(pair5.key,"cake");
+strcpy(pair5.value, "SANCHEZ");
+
+strcpy(pair6.key,"cake");
+strcpy(pair6.value, "SCIENCE");
+
+strcpy(pair7.key,"cake");
+strcpy(pair7.value,"WISEWOLF");
+
+strcpy(pair8.key,"cake");
+strcpy(pair8.value, "MERCHANT");
+
 kv_store_create(SharedMemoryName);
 setSharedMemoryAddress();
 initializeShareMemoryStruct();
 
-kv_store_write(pair2.key , pair2.value);
-kv_store_write(pair3.key, pair3.value);
+int fill = 0;
+for(fill ; fill < 32; fill++){
 kv_store_write(pair1.key , pair1.value);
+kv_store_write(pair2.key , pair2.value);
+kv_store_write(pair3.key , pair3.value);
+kv_store_write(pair4.key , pair4.value);
+kv_store_write(pair5.key , pair5.value);
+kv_store_write(pair6.key , pair6.value);
+kv_store_write(pair7.key , pair7.value);
+kv_store_write(pair8.key , pair8.value);
+}
+
+kv_store_write(pair7.key , pair7.value);
+kv_store_write(pair8.key , pair8.value);
+
+
+printf("This is KEY : %s\n", (char*) (sharedMemory + sizeof(SM) + 217 * podSpace));
+printf("This is VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) + 217 * podSpace + keySize));
+
+printf("This is KEY : %s\n", (char*) (sharedMemory + sizeof(SM) + 217 * podSpace + sizeOfRecord ));
+printf("This is VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) + 217 * podSpace + sizeOfRecord + keySize));
+
+printf("----------------------------------\n\n");
+
+
+printf("This is KEY : %s\n", (char*) (sharedMemory + sizeof(SM) + 217 * podSpace + sizeOfRecord * 255 ));
+printf("This is VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) + 217 * podSpace + sizeOfRecord * 255 + keySize));
+
+printf("This is KEY : %s\n", (char*) (sharedMemory + sizeof(SM) + 217 * podSpace + sizeOfRecord * 256 ));
+printf("This is VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) + 217 * podSpace + sizeOfRecord * 256 + keySize));
 
 
 //printf("This is KEY VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) ));
@@ -228,7 +283,7 @@ printf("VALUE : %s\n", (char*) (sharedMemory + sizeof(SM) + 288 * i) );
 //kv_store_write("cake", "NOT A LIE");
 
 
-
+/*
 char* duplicated1;
 char* duplicated2;
 char* duplicated3;
@@ -250,7 +305,7 @@ sameKey = kv_store_read_all(pair3.key);
 for ( i = 0 ; i < 2; i++){
 printf("USING KEY : %s, VALUE FOR A KEY IS : %s\n", pair3.key, sameKey[i]); 
 }
-
+*/
 
 
 //displayAllSharedMemory();
