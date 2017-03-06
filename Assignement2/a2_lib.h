@@ -1,5 +1,5 @@
-#ifndef _INCLUDE_KVS_H_
-#define _INCLUDE_KVS_H_
+#ifndef _INCLUDE_A2_LIB_H_
+#define _INCLUDE_A2_LIB_H_
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -40,10 +40,11 @@ int currentRecord;
 
 }SM;
 
-int kv_store_create(char *smName);
-int kv_store_write(char *key, char *value);
-char* kv_store_read(char *key);
-char ** kv_store_read_all(char *key);
+
+int  kv_store_create(char *name);
+int  kv_store_write(char *key,char *value);
+char *kv_store_read(char *key);
+char **kv_store_read_all(char *key);
 int kv_delete_db();
 
 int setSharedMemoryAddress();
