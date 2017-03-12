@@ -32,12 +32,10 @@ char value[256];
 
 typedef struct {
 
-//sem_t mutex;
-//sem_t db;
 int rc;
 int podCounters[256];
 int podRead[256];
-
+int initialized;
 }SM;
 
 
