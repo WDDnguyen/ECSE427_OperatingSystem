@@ -19,16 +19,16 @@ fd = shm_open("/will", O_CREAT|O_RDWR, S_IRWXU);
 
 int main()
 {
-	char* str = "CAKEMAN AND BANANA BOY";
-	char* str1 = "BOBMAN" ;
+	char* str = "WRITE THIS VALUE";
+	char* str1 = "GOOD IS BA";
 	setupSharedMemory();
 	char *addr = mmap(NULL, strlen(str)+strlen(str1), PROT_READ | PROT_WRITE, MAP_SHARED, fd , 0);
-	ftruncate(fd, strlen(str));
+	ftruncate(fd, strlen(str) + strlen(str1));
 	//close(fd);
 	memcpy(addr, str, strlen(str));	
 
-	ftruncate(fd, strlen(str1));
-	close(fd);
-	memcpy(addr,str1,strlen(str1));
+	//ftruncate(fd, strlen(str1));
+	//close(fd);
+	memcpy(addr+strlen(str1),str1,strlen(str1));
 }
 

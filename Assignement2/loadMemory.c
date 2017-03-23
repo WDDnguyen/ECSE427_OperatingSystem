@@ -27,9 +27,14 @@ int main()
 		printf("Error fstat\n");
 	}
 
-        char *addr = mmap(NULL, s.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd , 0);
+        char *addr = mmap(NULL, 50 , PROT_READ | PROT_WRITE, MAP_SHARED, fd , 0);
         close(fd);
-
-        write(STDOUT_FILENO, addr, s.st_size);
+	
+	char* test = addr;
+	char* good = addr + 10;
+	printf("FIRST VALUE IN MEMORY : %s\n",test);
+	printf("SECOND VALUE IN MEMORY :%s\n", good);
+	
+       // write(STDOUT_FILENO, addr, s.st_size);
 	//write(STDOUT_FILENO, addr , 2);
 }
