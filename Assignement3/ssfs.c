@@ -16,11 +16,8 @@ superblock_t sb;
 block_t fbm;
 block_t wm;
 
-// to do 
-int inodeFile[numberOfInodes];
-
 // File descriptor table to do 
-//fileDescriptor_t fdt[numberOfInodes];
+fileDescriptor_t fdt[numberOfInodes];
 
 void initializeSuperBlock(){
 	
@@ -29,7 +26,7 @@ void initializeSuperBlock(){
 	// need to implement shadow later 
 	
 	// need to adjust root size 
-	root.size = 1000;
+	root.size = 500;
 	for( i = 0 ; i < numberOfInodes ; i++){
 		root.direct[i] = 0;
 	}
@@ -42,8 +39,8 @@ void initializeSuperBlock(){
 	sb.fs_size = blockSize * numberOfBlocks; 
 	sb.Inodes = numberOfInodes;
 	sb.root = root;
-} 
-
+}
+ 
 void initializeFBM(){
 	int i;
 	for (i = 0 ; i < blockSize; i++){
@@ -104,7 +101,9 @@ void initializeFileDescriptorTable() {
 void mkssfs(){
 	initializeFBM();
 	initializeWM();
-
+	initializeSuperBlock();
+	printf(" THIS IS THE SIZE OF SUPER BLOCK : %zu\n", sizeof(sb));
+	
 	// block_t fbm, wm 
 	// loop bytes[i] = 0xFF 
 	// write_block(1,1 &fbm)
@@ -123,8 +122,10 @@ ssfc_fopen(char* name ){
 int main(){
 	
 	mkssfs();
-	int i;
+
+	/*int i;
 	int k;
+	
 	for(i = 0; i < blockSize; i++){
 		for(k = 0 ; k < 8 ;k++){
 		printf("%u ", !!(fbm.bytes[i] & (1 << k)));
@@ -141,7 +142,7 @@ int main(){
 		}
 		printf("\n");
 		
-	}
+	} */
 	
 	return 0;
 }

@@ -5,20 +5,8 @@
 #define sizeOfPointer 4
 #define numberOfBlocks 200
 #define numberOfInodes 14
-#define numberOfInodeblocks 1
 #define sizeOfInode 64
-
-
-//super block 
-#define magicValue 0xACBD0005
 #define sizeOfSuperBlockField 4 
-#define SBBlockSize 1
-
-//FBM and WM 
-#define bitsInABlock 8096
-#define FSMBlockSize 1 
-#define WMBlockSize 1
-
 
 // non standard inode 
 // size field  total number of bytes 
@@ -50,7 +38,8 @@ int Inodes;
 inode_t root;
 inode_t shadow[4];
 int lastShadow;
-
+//filling up the super block with empty value
+char fill[684];
 } superblock_t;
 
 
@@ -59,7 +48,6 @@ typedef struct{
 	unsigned char bytes[blockSize];
 }block_t;
 
-/*
 typedef struct {
     int free;
     int inode;
@@ -70,4 +58,3 @@ typedef struct {
     char name[16];
     int inode;
 } directoryEntry_t;
-*/
