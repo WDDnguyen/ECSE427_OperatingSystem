@@ -3,8 +3,8 @@
 // size of components
 #define blockSize 1024
 #define sizeOfPointer 4
-#define numberOfBlocks 200
-#define numberOfInodes 14
+#define numberOfBlocks 2800
+#define numberOfInodes 200
 #define sizeOfInode 64
 #define sizeOfSuperBlockField 4 
 
@@ -23,6 +23,11 @@ typedef struct {
 	int direct[14];
 	int indirect;
 } inode_t;
+
+
+typedef struct {
+	inode_t inodeSlot[16];
+} inodeBlock_t;
 
 // root is a jnode
 // have to add shadow jnode later

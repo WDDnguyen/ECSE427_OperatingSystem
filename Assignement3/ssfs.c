@@ -17,10 +17,57 @@ block_t fbm;
 block_t wm;
 inode_t root;
 
-block_t inodeblock[14];
+inodeBlock_t inodeBlocks[13];
 
 // File descriptor table to do 
 fileDescriptor_t fdt[numberOfInodes];
+
+void initializeInodeFiles(){
+	int i;
+	int k;
+	//printf("SIZE OF INODE BLOCK : %zu\n", sizeof(inodeBlock_t));
+	inode_t tempInode;
+	tempInode.size = -1;
+	for (i =0 ; i < 14 ; i++){
+		tempInode.direct[i] = -1;
+	}
+	tempInode.indirect = -1;
+	
+	for (i = 0; i < 13 ; i++){
+	for (k = 0 ; k < 16; k++){
+		inodeBlocks[i].inodeSlot[k]=tempInode;
+		//printf("tempNode size : %d, direct value : %d, indirect value : %d at i : %d , k ; %d\n", inodeBlocks[i].inodeSlot[k].size, inodeBlocks[i].inodeSlot[k].direct[1], inodeBlocks[i].inodeSlot[k].indirect, i, k);
+		}
+	}
+	
+	
+}
+
+void setInodeDirect(int index, int blockNumber){
+	int block = index / 16;
+	int slot = index % 16;
+	int i;
+	
+	for(i = 0; i< 14; i++){
+		if( inodeBlocks[block].inodeSlot[slot].direct[i] == -1){
+			inodeBlocks[block].inodeSlot[slot].direct[i] = blockNumber;
+			break;
+		}
+	}
+	
+}
+void getInode(int index){
+	int block = index / 16;
+	int slot = index % 16;
+	int i;
+	
+	printf("INODE BLOCK TO SEARCH : %d\n", block);
+	printf("SLOT TO SEARCH : %d\n", slot);
+	
+	for (i = 0; i < 14; i++){
+	printf("This is what the block is pointing right now : %d\n", inodeBlocks[block].inodeSlot[slot].direct[i]);
+	}
+}
 
 void initializeSuperBlock(){
 	
@@ -72,7 +119,7 @@ int FBMGetFreeBit(){
 		}
 	}
 	
-	printf("No more free bits left \n");
+	//printf("No more free bits left \n");
 	return -1; 
 }
 
@@ -95,8 +142,9 @@ void mkssfs(){
 	initializeFBM();
 	initializeWM();
 	initializeSuperBlock();
-	printf(" THIS IS THE SIZE OF SUPER BLOCK : %zu\n", sizeof(sb));
-	printf(" THIS IS THE SIZE OF INODE : %zu\n", sizeof(inode_t));
+	initializeInodeFiles();
+	//printf(" THIS IS THE SIZE OF SUPER BLOCK : %zu\n", sizeof(sb));
+	//printf(" THIS IS THE SIZE OF INODE : %zu\n", sizeof(inode_t));
 		
 	// block_t fbm, wm 
 	// loop bytes[i] = 0xFF 
@@ -116,6 +164,12 @@ ssfc_fopen(char* name ){
 int main(){
 	
 	mkssfs();
+	setInodeDirect(65,1752);
+	setInodeDirect(65,1753);
+	setInodeDirect(65,1754);
+	setInodeDirect(65,1755);
+	getInode(65);
+	getInode(64);
 
 	/*int i;
 	int k;
