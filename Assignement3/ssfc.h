@@ -8,6 +8,8 @@
 #define sizeOfInode 64
 #define sizeOfSuperBlockField 4 
 
+#define myFileName "WDDNguyen"
+
 // non standard inode 
 // size field  total number of bytes 
 // no need to know about indirect 
