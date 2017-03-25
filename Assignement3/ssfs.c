@@ -150,17 +150,18 @@ int FBMGetFreeBit(){
 	int k;
 	for (i = 0; i < blockSize; i++){
 		for (k = 0; k < 8 ; k++){
-			if (fbm.bytes[i] & (1 << k) != 0x00){
+			if ((fbm.bytes[i] & (1 << k)) == (1 << k)){
 				
 				printf("Found a free bit at : %d\n", i * 8 + k);
 				// set the bit to 0 
 				fbm.bytes[i] = fbm.bytes[i] ^ (1 << k);
 				return (i * 8 + k); 
-			} 
+			}
+				
 		}
 	}
 	
-	//printf("No more free bits left \n");
+	printf("No more free bits left \n");
 	return -1; 
 }
 
@@ -215,9 +216,16 @@ void mkssfs(int fresh){
 		write_blocks(4 + i, 1, &inodeBlocks[i]);
 	}
 	
+	// set the bits for superblock,fbm,wm,rootDirectory, inode files to 0);
+	// CHANGE BACK TO 16
+	for( i = 0 ; i < 20; i++){
+	FBMGetFreeBit();
+	}
 	
-	rootDirectory_t rootBuffer; 
-	read_blocks(3,1,&rootBuffer);
+	
+	
+	//rootDirectory_t rootBuffer; 
+	//read_blocks(3,1,&rootBuffer);
 	
 	/*for (i = 0 ; i < 51 ; i++){
 		printf("ENTRY NAME : %s, ENTRY VALUE : %d\n", rootBuffer.entries[i].name, rootBuffer.entries[i].inodeIndex); 
@@ -243,10 +251,25 @@ void mkssfs(int fresh){
 	*/
 	
 	
+	}
+	// FILE SYSTEM ALREADY EXISTED
+	else {
+
+	initializeFileDescriptorTable();
+	init_disk(myFileName, blockSize, numberOfBlocks);
+	
+	// open super block 
+	read_blocks(0,1,&sb);
+	// open FBM 
+	read_blocks(1,1,&fbm);
+	// open WM
+	read_blocks(2,1,&wm);
+	// open root directory
+	read_blocks(3,1,&rootDirectory);
 	
 	
 	
-	
+		
 	}
 	
 	//printf(" THIS IS THE SIZE OF SUPER BLOCK : %zu\n", sizeof(sb));
@@ -277,19 +300,20 @@ int main(){
 	//getInode(65);
 	//getInode(64);
 
-	/*int i;
+	int i;
 	int k;
-	
-	for(i = 0; i < blockSize; i++){
-		for(k = 0 ; k < 8 ;k++){
+	/*
+	for(i = 0; i < 100 ; i++){
+		for(k = 0 ; k < 8 ; k++){
 		printf("%u ", !!(fbm.bytes[i] & (1 << k)));
 		
 		}
 		printf("\n");
 		
 	}
-
-	for(i = 0; i < blockSize; i++){
+	*/
+	
+	 /*for(i = 0; i < blockSize; i++){
 		for(k = 0 ; k < 8 ;k++){
 		printf("%u", !!(wm.bytes[i] & (1 << k)));
 		
