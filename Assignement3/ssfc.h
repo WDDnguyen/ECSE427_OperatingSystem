@@ -63,5 +63,10 @@ typedef struct {
  
 typedef struct {
     char name[16];
-    int inode;
+    int inodeIndex;
 } directoryEntry_t;
+
+typedef struct{
+	int size;
+	directoryEntry_t entries[51];
+} rootDirectory_t;
