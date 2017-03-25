@@ -15,20 +15,22 @@
 superblock_t sb;
 block_t fbm;
 block_t wm;
+inode_t root;
+
+block_t inodeblock[14];
 
 // File descriptor table to do 
 fileDescriptor_t fdt[numberOfInodes];
 
 void initializeSuperBlock(){
 	
-	inode_t root;
 	int i;
+	int k;
 	// need to implement shadow later 
-	
-	// need to adjust root size 
-	root.size = 500;
+
+	root.size = 13312;
 	for( i = 0 ; i < numberOfInodes ; i++){
-		root.direct[i] = 0;
+		root.direct[i] = -1;
 	}
 	
 	sb.magic[0] = 0xAC;
@@ -62,7 +64,7 @@ int FBMGetFreeBit(){
 		for (k = 0; k < 8 ; k++){
 			if (fbm.bytes[i] & (1 << k) != 0x00){
 				
-				printf("Found a free bit at : %d\n", i);
+				printf("Found a free bit at : %d\n", i * 8 + k);
 				// set the bit to 0 
 				fbm.bytes[i] = fbm.bytes[i] ^ (1 << k);
 				return (i * 8 + k); 
@@ -73,15 +75,6 @@ int FBMGetFreeBit(){
 	printf("No more free bits left \n");
 	return -1; 
 }
-/*
-void FBMSetBit(int index){
-	fbm.bytes[index] = 0x00;
-}
-
-void FBMClearBit(int index){
-	fbm.bytes[index] = 0xFF;
-}
-*/
 
 // initialize file directory  and set all values to free, rwptr to 0 and  no inode values 
 
@@ -103,7 +96,8 @@ void mkssfs(){
 	initializeWM();
 	initializeSuperBlock();
 	printf(" THIS IS THE SIZE OF SUPER BLOCK : %zu\n", sizeof(sb));
-	
+	printf(" THIS IS THE SIZE OF INODE : %zu\n", sizeof(inode_t));
+		
 	// block_t fbm, wm 
 	// loop bytes[i] = 0xFF 
 	// write_block(1,1 &fbm)
