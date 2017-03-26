@@ -48,7 +48,15 @@ void initializeInodeFiles(){
 		//printf("tempNode size : %d, direct value : %d, indirect value : %d at i : %d , k ; %d\n", inodeBlocks[i].inodeSlot[k].size, inodeBlocks[i].inodeSlot[k].direct[1], inodeBlocks[i].inodeSlot[k].indirect, i, k);
 		}
 	}
-		
+	
+	
+	//TEST TO MAKE SURE IT ACTUALLY WORKS 
+	// setting root directory as first i-node;
+	// NEED TO CHANGE TO 0
+	tempInode.size = 0;
+	tempInode.direct[0] = sb.rootDirectoryBlockNumber;
+	inodeBlocks[0].inodeSlot[0] = tempInode;
+	
 }
 
 void setInodeDirect(int index, int blockNumber){
@@ -185,11 +193,13 @@ int clearWMbit(int blockNumber, int setBlockNumber){
 	int bit = blockNumber % 8;
 	wm.bytes[byte] = wm.bytes[byte] ^ (1 << bit); 
 	
+	// might need it but  have to make it writtable
+	/*
 	int nbyte = setBlockNumber / 8;
 	int nbit = setBlockNumber % 8;
 
 	wm.bytes[nbyte] = wm.bytes[nbyte] ^ (1 << nbit);
-	 
+	 */
 }
 
 int clearBlockInformation(int blockNumber, int newBlockNumber){
@@ -204,13 +214,6 @@ int clearBlockInformation(int blockNumber, int newBlockNumber){
 	clearFBMbit(blockNumber);
 	clearWMbit(blockNumber,newBlockNumber);
 	write_blocks(blockNumber, 1, &empty);
-	
-}
-
-int updateMetaDataBlocks(){
-	write_blocks(0,1, &sb);
-	write_blocks(1,1, &fbm);
-	write_blocks(2,1, &wm);
 	
 }
 
@@ -231,10 +234,99 @@ int createNewRootDirectory(){
 	write_blocks(0,1, &sb);
 	write_blocks(1,1, &fbm);
 	write_blocks(2,1, &wm);
-	
-	
-	
+
 	printf("NEW DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
+	
+}
+
+int createRootInodeFile(){
+	int i,k,p;
+	int blockNumber,newBlockNumber;
+	int inodeIndex = -1;
+	inodeBlock_t inodeBlockFound;
+	//check for all the i-nodes files
+	
+	for (i = 0; i < 13; i++){
+		blockNumber = sb.root.direct[i];
+		//printf("blockNumber : %d\n", blockNumber);
+		read_blocks(blockNumber,1,&inodeBlockFound);
+		for(k = 0; k < 16; k++){
+			for(p = 0; p < 14; p++){
+				if (inodeBlockFound.inodeSlot[k].direct[p] == sb.rootDirectoryBlockNumber){
+					inodeIndex = i * 64 + k ;
+					break;
+				}		
+			}
+			if (inodeIndex > 0){
+					break;
+				}
+		}
+		if (inodeIndex > 0){
+					break;
+				}
+	}
+	
+	// Find new block location 
+	newBlockNumber = FBMGetFreeBit();
+	// write the inode block with the root inode into a new block MIGHT NEED TO LINK IT  
+	write_blocks(newBlockNumber,1,&inodeBlockFound);
+	// maybe dont need to delete the inode block 
+	clearBlockInformation(blockNumber);
+	// set the root j-node  with the new block 
+	sb.root[i] = newBlockNumber;
+	//update the meta data 
+	write_blocks(0,1, &sb);
+	write_blocks(1,1, &fbm);
+	write_blocks(2,1, &wm);
+	
+	return inodeIndex;
+	
+}
+
+/* TEST TOMORROW 
+int createEntry(char* fname){
+	int i;
+	directoryEntry_t entry;
+	stpcpy(entry.name,fname);
+	entry.inodeIndex = findFreeInode();
+	for (i = 0; i < numberOfEntries; i++){
+		if (rootDirectory.entries[i].inodeIndex == -1){
+			rootDirectory.entries[i] = entry;
+		}
+	}
+	
+}
+*/
+
+// NEED TO CHANGE THE BIT AFTER REMOVING 
+int findFreeInode(){
+	int i,k,p;
+	int blockNumber;
+	int inodeIndex = -1;
+	inodeBlock_t inodeBlockFound;
+	
+	//check for all the i-nodes files
+	for (i = 0; i < 13; i++){
+		blockNumber = sb.root.direct[i];
+		//printf("blockNumber : %d\n", blockNumber);
+		read_blocks(blockNumber,1,&inodeBlockFound);
+		for(k = 0; k < 16; k++){
+			
+				if (inodeBlockFound.inodeSlot[k].size == -1){
+					inodeIndex = i * 64 + k ;
+					break;
+				}
+				
+				if (inodeIndex > 0){
+					break;
+				}
+		}
+		if (inodeIndex > 0){
+					break;
+				}
+	}
+		
+	return inodeIndex;
 	
 }
 
@@ -270,7 +362,9 @@ void mkssfs(int fresh){
 		
 		initializeFileDescriptorTable();
 		
-		updateMetaDataBlocks();
+		write_blocks(0,1, &sb);
+		write_blocks(1,1, &fbm);
+		write_blocks(2,1, &wm);		
 		write_blocks(sb.rootDirectoryBlockNumber,1, &rootDirectory);
 		for (i = 0; i < 13; i++){
 			write_blocks(4 + i, 1, &inodeBlocks[i]);
@@ -340,13 +434,17 @@ void mkssfs(int fresh){
 int main(){
 	
 	//mkssfs(4);
-	mkssfs(0);
+	mkssfs(1);
 	//printf("NEW DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
-	
-	createNewRootDirectory();
 	
 	//createNewRootDirectory();
 	
+	//createNewRootDirectory();
+	int inodeIndex = createRootInodeFile();
+	printf("INODE INDEX : %d\n", inodeIndex);
+	int freeIndex = findFreeInode(-1);
+	printf("FREE INODE INDEX : %d\n", freeIndex);
+	/*
 	int i;
 	int k;
 	printf("--------------------------------------------------------------------\n");
@@ -365,14 +463,7 @@ int main(){
 		printf("\n");
 		
 	}
-	printf("--------------------------------------------------------------------\n");
-	
-	
+	printf("--------------------------------------------------------------------\n"); */
 	
 	return 0;
 }
-
-
-
-
-

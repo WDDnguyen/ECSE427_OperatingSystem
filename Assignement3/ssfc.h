@@ -74,7 +74,7 @@ typedef struct{
 	directoryEntry_t entries[64];
 } rootDirectory_t;
 
-//void mkssfs(int fresh);
+void mkssfs(int fresh);
 /*int ssfs_fopen(char *name);
 int ssfs_frseek(int fileID, int loc);
 int ssfs_fwseek(int fileID, int loc);
