@@ -257,6 +257,10 @@ int createNewRootDirectory(){
 	write_blocks(2,1, &wm);
 	
 	printf("NEW DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
+	// setting the directory cache after creating new root Directory
+	read_blocks(sb.rootDirectoryBlockNumber, 1, &rootDirectory);
+	
+	return blockNumber;
 	
 }
 
@@ -284,8 +288,7 @@ int createRootInodeFile(int bn){
 		
 	// After creating new root Directory and new File.  Add root directory block into the inode file containing the previous root directory block
 	read_blocks(sb.root.direct[i],1, &inodeBlockFound);
-	
-	
+
 	for (i = 0 ; i < 16; i++){
 		for (k = 0; k < 14; i++){
 			if (inodeBlockFound.inodeSlot[i].direct[k] == sb.rootDirectoryBlockNumber){
@@ -327,20 +330,50 @@ int findRootInodeFile(int bn){
 	
 }
 
-/* TEST TOMORROW 
-int createEntry(char* fname){
+int rootAddInode(int inodeIndex){
+	int i = inodeIndex / 16;
+	int k;
+	inode_t newInode;
+	
+	for (k = 0 ; k < 14; k++){
+		newInode.direct[k] = -1;
+	}
+	newInode.size = 0;
+	
+	inodeBlock_t inodeBlockFound;
+	read_blocks(sb.root.direct[i],1,&inodeBlockFound);
+	
+	for(k = 0 ; i<16; k++){
+		if (inodeBlockFound.inodeSlot[k].size == -1){
+			inodeBlockFound.inodeSlot[k] = newInode;
+			write_blocks(sb.root.direct[i], 1, &inodeBlockFound);
+			printf("added new inode file to j-node block : %d, index : %d\n", sb.root.direct[i], inodeIndex);
+			return 1;
+		} 
+	}
+return -1;	
+}
+
+ // ASSUME NOT ALLOCATING DISK SPACE WHEN CREATING A FILE 
+int createFile(char* fname){
+	// might need to overwrite the index if too many entries
 	int i;
+	int freeIndex = findFreeInodeIndex();
 	directoryEntry_t entry;
 	stpcpy(entry.name,fname);
-	entry.inodeIndex = findFreeInode();
+	entry.inodeIndex = freeIndex;
 	for (i = 0; i < numberOfEntries; i++){
 		if (rootDirectory.entries[i].inodeIndex == -1){
 			rootDirectory.entries[i] = entry;
+			break;
+			//might have to write to the disk after commit change whenever 
+			write_block(sb.rootDirectoryBlockNumber,1, &rootDirectory);
 		}
 	}
 	
+	rootAddInode(freeIndex);
+	
 }
-*/
 
 // NEED TO CHANGE THE BIT AFTER REMOVING 
 int findFreeInodeIndex(){
@@ -355,19 +388,12 @@ int findFreeInodeIndex(){
 		blockNumber = sb.root.direct[i];
 		//printf("searching this block number :%d at root direct : %d\n", blockNumber, i);
 		read_blocks(blockNumber,1,&inodeBlockFound);
-		
-		
-	/*
-	for (k = 0 ; k < 16; k++){
-		printf("block size %d\n", inodeBlockFound.inodeSlot[k].size);	
-		}*/
-	
-		
+			
 		for(k = 0; k < 16; k++){
 				
 			//printf("value %d\n",inodeBlockFound.inodeSlot[k].size);
 			if (inodeBlockFound.inodeSlot[k].size == -1){
-				inodeIndex = i * 64 + k ;
+				inodeIndex = i * 16 + k ;
 				return inodeIndex;
 			}	
 		}
@@ -479,34 +505,40 @@ void mkssfs(int fresh){
 
 
 int main(){
+	int i,k;
 	
 	//mkssfs(4);
-	mkssfs(1);
+	mkssfs(0);
 	//printf("NEW DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
-	
-	createNewRootDirectory();
-	
-	int i;
-	int k;
+ 
+	//createNewRootDirectory();
+	printf("\n\n");
+	createFile("cake");
+	createFile("portal");
+	createFile("Catherine");
+	createFile("PERSONA");
+
+/*	
+	for (i = 0; i < numberOfEntries; i++){
+		printf("file : %s index : %d\n", rootDirectory.entries[i].name, rootDirectory.entries[i].inodeIndex);
+	}
 	
 	inodeBlock_t ib;
 	
 	read_blocks(18,1, &ib);
 	
-	for(i =0 ; i<1;i++){
-		for(k =0 ; k <14; k++){
-			printf("value : %d\n", ib.inodeSlot[i].direct[k]);
-		}
+	for(i =0 ; i<16;i++){
+		printf("value : %d\n", ib.inodeSlot[i].size);
 	}
-	
+*/
 	//createNewRootDirectory();
 	/*int rootBlock = findRootInodeFile();
 	printf("BLOCK NUMBER OF ROOT : %d\n", rootBlock);
 	int newRootBlock = createRootInodeFile();
 	printf("WROTE ROOT BLOCK TO THIS BLOCK : %d\n ", newRootBlock);
 	*/
-	int freeIndex = findFreeInodeIndex();
-	printf("FREE INODE INDEX : %d\n", freeIndex);
+	//int freeIndex = findFreeInodeIndex();
+	//printf("FREE INODE INDEX : %d\n", freeIndex);
 	/*
 	int i;
 	int k;
