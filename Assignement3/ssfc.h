@@ -3,11 +3,14 @@
 // size of components
 #define blockSize 1024
 #define sizeOfPointer 4
-#define numberOfBlocks 2800
+// might modified numberOf blocks 
+#define numberOfBlocks 1024
 #define numberOfInodes 200
 #define sizeOfInode 64
-#define sizeOfSuperBlockField 4 
+#define sizeOfSuperBlockField 4
 
+#define numberOfEntries 64
+ 
 #define myFileName "WDDNguyen"
 
 // non standard inode 
@@ -45,8 +48,9 @@ int Inodes;
 inode_t root;
 inode_t shadow[4];
 int lastShadow;
+int rootDirectoryBlockNumber; 
 //filling up the super block with empty value
-char fill[684];
+char fill[680];
 } superblock_t;
 
 
@@ -62,11 +66,10 @@ typedef struct {
 } fileDescriptor_t;
  
 typedef struct {
-    char name[16];
+    char name[10];
     int inodeIndex;
 } directoryEntry_t;
 
 typedef struct{
-	int size;
-	directoryEntry_t entries[51];
+	directoryEntry_t entries[64];
 } rootDirectory_t;
