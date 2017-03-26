@@ -20,8 +20,6 @@ rest is data blocks
 
 */
 
-//TEST THE BLOCKS 
-
 superblock_t sb;
 block_t fbm;
 block_t wm;
@@ -32,8 +30,6 @@ block_t wm;
 fileDescriptor_t fdt[numberOfInodes];
 inodeBlock_t inodeBlocks[13];
 rootDirectory_t rootDirectory;
-
-int rootBlock;
 
 void initializeInodeFiles(){
 	int i;
@@ -81,14 +77,6 @@ void getInode(int index){
 	}
 }
 
-//need to test
-/*void rootJNode_getBlock(int index){
-	int block = index / 16;
-	int slot = index % 16;
-	int i;
-	
-}
-*/
 void initializeRootDirectory(){
 	int i;
 		
@@ -156,7 +144,8 @@ void initializeWM(){
 int setWMbit(int blockNumber){
 	int byte = blockNumber / 8;
 	int bit = blockNumber % 8;
-	wm.bytes[byte] = wm.bytes[byte] ^ (1 << bit); 
+	wm.bytes[byte] = wm.bytes[byte] ^ (1 << bit);
+
 }
 
 // MIGHT NEED A WM FUNCTION TO SET VALUE TO WRITE;
@@ -184,18 +173,27 @@ int FBMGetFreeBit(){
 int clearFBMbit(int blockNumber){
 	 int byte = blockNumber / 8;
 	 int bit = blockNumber % 8;
+	 printf("BYTE CLEAR %d\n", byte);
+	 printf("BIT TO CLEAR %d\n", bit);
+	 
 	 fbm.bytes[byte] = fbm.bytes[byte] ^ (1 << bit); 
 	 
 }
 
-int clearWMbit(int blockNumber){
+int clearWMbit(int blockNumber, int setBlockNumber){
 	int byte = blockNumber / 8;
 	int bit = blockNumber % 8;
 	wm.bytes[byte] = wm.bytes[byte] ^ (1 << bit); 
+	
+	int nbyte = setBlockNumber / 8;
+	int nbit = setBlockNumber % 8;
+
+	wm.bytes[nbyte] = wm.bytes[nbyte] ^ (1 << nbit);
 	 
 }
 
-int clearBlockInformation(int blockNumber){
+int clearBlockInformation(int blockNumber, int newBlockNumber){
+	printf("BLOCK NUMBER INFORMATION TO CLEAR %d\n", blockNumber);
 	int i; 
 	block_t empty;
 	
@@ -204,21 +202,39 @@ int clearBlockInformation(int blockNumber){
 	}
 	
 	clearFBMbit(blockNumber);
-	clearWMbit(blockNumber);
+	clearWMbit(blockNumber,newBlockNumber);
 	write_blocks(blockNumber, 1, &empty);
+	
+}
+
+int updateMetaDataBlocks(){
+	write_blocks(0,1, &sb);
+	write_blocks(1,1, &fbm);
+	write_blocks(2,1, &wm);
 	
 }
 
 int createNewRootDirectory(){
 	int blockNumber = FBMGetFreeBit();
+	
+	printf("CURRENT DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
 	//write new root directory block to a free location 
 	read_blocks(sb.rootDirectoryBlockNumber, 1, &rootDirectory);
 	// rootDirectory variable is now the new rootDirectory
 	write_blocks(blockNumber, 1, &rootDirectory);
 	// clear root directory in previous block
-	clearBlockInformation(sb.rootDirectoryBlockNumber);
+	clearBlockInformation(sb.rootDirectoryBlockNumber, blockNumber);
 	//set new directory block number in sb.
 	sb.rootDirectoryBlockNumber = blockNumber;
+	//write sb with the new root Directory block number 
+	//updateMetaDataBlocks();
+	write_blocks(0,1, &sb);
+	write_blocks(1,1, &fbm);
+	write_blocks(2,1, &wm);
+	
+	
+	
+	printf("NEW DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
 	
 }
 
@@ -254,9 +270,7 @@ void mkssfs(int fresh){
 		
 		initializeFileDescriptorTable();
 		
-		write_blocks(0,1, &sb);
-		write_blocks(1,1, &fbm);
-		write_blocks(2,1, &wm);
+		updateMetaDataBlocks();
 		write_blocks(sb.rootDirectoryBlockNumber,1, &rootDirectory);
 		for (i = 0; i < 13; i++){
 			write_blocks(4 + i, 1, &inodeBlocks[i]);
@@ -293,7 +307,7 @@ void mkssfs(int fresh){
 	}
 	// FILE SYSTEM ALREADY EXISTED
 	else {
-	
+	printf("ONLY GO HERE IF FRESH = 0 \n");
 	char* filename = "WDDNGUYEN";
 	initializeFileDescriptorTable();
 	init_disk(filename, blockSize, numberOfBlocks);
@@ -306,9 +320,9 @@ void mkssfs(int fresh){
 	read_blocks(2,1,&wm);
 	// open root directory
 	read_blocks(sb.rootDirectoryBlockNumber,1,&rootDirectory);
-
-	}
 	
+	}
+	/*
 	printf("--------------------------------------------------------------------\n");
 	printf("Block Size : %d\n", sb.block_size);
 	printf("File System Size : %d\n", sb.fs_size);
@@ -319,13 +333,41 @@ void mkssfs(int fresh){
 	printf("SIZE OF rootDirectory : %zu\n", sizeof(rootDirectory_t));
 	printf("SIZE OF DIRECTORY ENTRY  : %zu\n", sizeof(directoryEntry_t));
 	printf("SIZE OF INODE Block : %zu\n", sizeof(inodeBlock_t));
-	printf("--------------------------------------------------------------------\n");
+	printf("--------------------------------------------------------------------\n"); */
 }
+
 
 int main(){
 	
-	//mkssfs(0);
-	mkssfs(1);
+	//mkssfs(4);
+	mkssfs(0);
+	//printf("NEW DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
+	
+	createNewRootDirectory();
+	
+	//createNewRootDirectory();
+	
+	int i;
+	int k;
+	printf("--------------------------------------------------------------------\n");
+	for(i = 0; i < 10; i++){
+		for(k = 0 ; k < 8 ;k++){
+		printf("%u ", !!(fbm.bytes[i] & (1 << k)));
+		}
+		printf("\n");
+		
+	}
+	printf("--------------------------------------------------------------------\n");
+	for(i = 0; i < 10; i++){
+		for(k = 0 ; k < 8 ;k++){
+		printf("%u ", !!(wm.bytes[i] & (1 << k)));
+		}
+		printf("\n");
+		
+	}
+	printf("--------------------------------------------------------------------\n");
+	
+	
 	
 	return 0;
 }
