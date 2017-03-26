@@ -240,24 +240,30 @@ int createNewRootDirectory(){
 	read_blocks(sb.rootDirectoryBlockNumber, 1, &rootDirectory);
 	// rootDirectory variable is now the new rootDirectory
 	write_blocks(blockNumber, 1, &rootDirectory);
+	
+	//create new InodeFile
+	createRootInodeFile(blockNumber);
+	
 	// clear root directory in previous block
-		clearBlockInformation(sb.rootDirectoryBlockNumber, blockNumber);
+		//clearBlockInformation(sb.rootDirectoryBlockNumber, blockNumber);
 	//set new directory block number in sb.
 	sb.rootDirectoryBlockNumber = blockNumber;
+	
 	//write sb with the new root Directory block number 
 	//updateMetaDataBlocks();
+	
 	write_blocks(0,1, &sb);
 	write_blocks(1,1, &fbm);
 	write_blocks(2,1, &wm);
-
+	
 	printf("NEW DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
 	
 }
 
-int createRootInodeFile(){
-	int i;
-	int newBlockNumber,jnodeBlock;
-	int blockNumber = findRootInodeFile();
+int createRootInodeFile(int bn){
+	int i,k;
+	int newBlockNumber;
+	int blockNumber = findRootInodeFile(bn);
 	inodeBlock_t inodeBlockFound;
 	
 	read_blocks(blockNumber, 1, &inodeBlockFound);
@@ -269,29 +275,32 @@ int createRootInodeFile(){
 		}
 	}
 	
-		
 	// Find new block location 
 	newBlockNumber = FBMGetFreeBit();
-	printf("NEW ROOT BLOCK : %d at root INDEX : %d\n ", newBlockNumber,jnodeBlock);
-	// write the inode block with the root inode into a new block MIGHT NEED TO LINK IT  
+	printf("New root inode block : %d at j-node index: %d\n ", newBlockNumber,i);
+	
 	write_blocks(newBlockNumber,1,&inodeBlockFound);
+	sb.root.direct[i] = newBlockNumber;
+		
+	// After creating new root Directory and new File.  Add root directory block into the inode file containing the previous root directory block
+	read_blocks(sb.root.direct[i],1, &inodeBlockFound);
 	
-	// maybe dont need to delete the inode block 
-	//clearBlockInformation(blockNumber);
-	// set the root j-node  with the new block
-	//printf("J-node block INDEX : %d\n", jnodeBlock);
-	sb.root.direct[jnodeBlock] = newBlockNumber;
 	
-	//setFBMbit(newBlockNumber);
-	//update the meta data 
-	write_blocks(0,1, &sb);
-	write_blocks(1,1, &fbm);
-	write_blocks(2,1, &wm);
+	for (i = 0 ; i < 16; i++){
+		for (k = 0; k < 14; i++){
+			if (inodeBlockFound.inodeSlot[i].direct[k] == sb.rootDirectoryBlockNumber){
+				printf("previous root block: %d  new root block : %d\n", sb.rootDirectoryBlockNumber,bn);
+				inodeBlockFound.inodeSlot[i].direct[k] = bn;
+				write_blocks(newBlockNumber,1, &inodeBlockFound);
+				return newBlockNumber;
+			} 
+		}
+	}
 	
-	return newBlockNumber;
+	return -2;
 }
 
-int findRootInodeFile(){
+int findRootInodeFile(int bn){
 	int i,k,p;
 	//int inodeIndex = -5;
 	int blockNumber = -5;
@@ -475,13 +484,27 @@ int main(){
 	mkssfs(1);
 	//printf("NEW DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
 	
-	//createNewRootDirectory();
+	createNewRootDirectory();
+	
+	int i;
+	int k;
+	
+	inodeBlock_t ib;
+	
+	read_blocks(18,1, &ib);
+	
+	for(i =0 ; i<1;i++){
+		for(k =0 ; k <14; k++){
+			printf("value : %d\n", ib.inodeSlot[i].direct[k]);
+		}
+	}
 	
 	//createNewRootDirectory();
-	int rootBlock = findRootInodeFile();
+	/*int rootBlock = findRootInodeFile();
 	printf("BLOCK NUMBER OF ROOT : %d\n", rootBlock);
 	int newRootBlock = createRootInodeFile();
 	printf("WROTE ROOT BLOCK TO THIS BLOCK : %d\n ", newRootBlock);
+	*/
 	int freeIndex = findFreeInodeIndex();
 	printf("FREE INODE INDEX : %d\n", freeIndex);
 	/*
