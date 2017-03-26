@@ -57,6 +57,14 @@ void initializeInodeFiles(){
 	tempInode.direct[0] = sb.rootDirectoryBlockNumber;
 	inodeBlocks[0].inodeSlot[0] = tempInode;
 	
+	/*
+	for (i = 0; i < 13 ; i++){
+	for (k = 0 ; k < 16; k++){
+		printf("block size %d\n", inodeBlocks[i].inodeSlot[k].size);
+		//printf("tempNode size : %d, direct value : %d, indirect value : %d at i : %d , k ; %d\n", inodeBlocks[i].inodeSlot[k].size, inodeBlocks[i].inodeSlot[k].direct[1], inodeBlocks[i].inodeSlot[k].indirect, i, k);
+		}
+	}
+	*/
 }
 
 void setInodeDirect(int index, int blockNumber){
@@ -178,6 +186,13 @@ int FBMGetFreeBit(){
 	return -1; 
 }
 
+int setFBMbit(int blockNumber){
+	int byte = blockNumber / 8;
+	int bit = blockNumber % 8;
+	fbm.bytes[byte] = fbm.bytes[byte] ^ (1 << bit); 
+	  
+}
+
 int clearFBMbit(int blockNumber){
 	 int byte = blockNumber / 8;
 	 int bit = blockNumber % 8;
@@ -226,7 +241,7 @@ int createNewRootDirectory(){
 	// rootDirectory variable is now the new rootDirectory
 	write_blocks(blockNumber, 1, &rootDirectory);
 	// clear root directory in previous block
-	clearBlockInformation(sb.rootDirectoryBlockNumber, blockNumber);
+		clearBlockInformation(sb.rootDirectoryBlockNumber, blockNumber);
 	//set new directory block number in sb.
 	sb.rootDirectoryBlockNumber = blockNumber;
 	//write sb with the new root Directory block number 
@@ -240,9 +255,46 @@ int createNewRootDirectory(){
 }
 
 int createRootInodeFile(){
+	int i;
+	int newBlockNumber,jnodeBlock;
+	int blockNumber = findRootInodeFile();
+	inodeBlock_t inodeBlockFound;
+	
+	read_blocks(blockNumber, 1, &inodeBlockFound);
+	
+	//find root direct index containing the block Number
+	for(i = 0 ; i < 13; i++){
+		if (sb.root.direct[i] == blockNumber){
+			break;
+		}
+	}
+	
+		
+	// Find new block location 
+	newBlockNumber = FBMGetFreeBit();
+	printf("NEW ROOT BLOCK : %d at root INDEX : %d\n ", newBlockNumber,jnodeBlock);
+	// write the inode block with the root inode into a new block MIGHT NEED TO LINK IT  
+	write_blocks(newBlockNumber,1,&inodeBlockFound);
+	
+	// maybe dont need to delete the inode block 
+	//clearBlockInformation(blockNumber);
+	// set the root j-node  with the new block
+	//printf("J-node block INDEX : %d\n", jnodeBlock);
+	sb.root.direct[jnodeBlock] = newBlockNumber;
+	
+	//setFBMbit(newBlockNumber);
+	//update the meta data 
+	write_blocks(0,1, &sb);
+	write_blocks(1,1, &fbm);
+	write_blocks(2,1, &wm);
+	
+	return newBlockNumber;
+}
+
+int findRootInodeFile(){
 	int i,k,p;
-	int blockNumber,newBlockNumber;
-	int inodeIndex = -1;
+	//int inodeIndex = -5;
+	int blockNumber = -5;
 	inodeBlock_t inodeBlockFound;
 	//check for all the i-nodes files
 	
@@ -250,36 +302,19 @@ int createRootInodeFile(){
 		blockNumber = sb.root.direct[i];
 		//printf("blockNumber : %d\n", blockNumber);
 		read_blocks(blockNumber,1,&inodeBlockFound);
+		
 		for(k = 0; k < 16; k++){
 			for(p = 0; p < 14; p++){
 				if (inodeBlockFound.inodeSlot[k].direct[p] == sb.rootDirectoryBlockNumber){
-					inodeIndex = i * 64 + k ;
-					break;
+					//inodeIndex = i * 64 + k ;
+					//return inodeIndex;
+					return blockNumber;
 				}		
 			}
-			if (inodeIndex > 0){
-					break;
-				}
 		}
-		if (inodeIndex > 0){
-					break;
-				}
 	}
 	
-	// Find new block location 
-	newBlockNumber = FBMGetFreeBit();
-	// write the inode block with the root inode into a new block MIGHT NEED TO LINK IT  
-	write_blocks(newBlockNumber,1,&inodeBlockFound);
-	// maybe dont need to delete the inode block 
-	clearBlockInformation(blockNumber);
-	// set the root j-node  with the new block 
-	sb.root[i] = newBlockNumber;
-	//update the meta data 
-	write_blocks(0,1, &sb);
-	write_blocks(1,1, &fbm);
-	write_blocks(2,1, &wm);
-	
-	return inodeIndex;
+	return blockNumber;
 	
 }
 
@@ -299,31 +334,34 @@ int createEntry(char* fname){
 */
 
 // NEED TO CHANGE THE BIT AFTER REMOVING 
-int findFreeInode(){
+int findFreeInodeIndex(){
 	int i,k,p;
 	int blockNumber;
-	int inodeIndex = -1;
+	int inodeIndex = -5;
 	inodeBlock_t inodeBlockFound;
 	
 	//check for all the i-nodes files
 	for (i = 0; i < 13; i++){
+		
 		blockNumber = sb.root.direct[i];
-		//printf("blockNumber : %d\n", blockNumber);
+		//printf("searching this block number :%d at root direct : %d\n", blockNumber, i);
 		read_blocks(blockNumber,1,&inodeBlockFound);
+		
+		
+	/*
+	for (k = 0 ; k < 16; k++){
+		printf("block size %d\n", inodeBlockFound.inodeSlot[k].size);	
+		}*/
+	
+		
 		for(k = 0; k < 16; k++){
-			
-				if (inodeBlockFound.inodeSlot[k].size == -1){
-					inodeIndex = i * 64 + k ;
-					break;
-				}
 				
-				if (inodeIndex > 0){
-					break;
-				}
+			//printf("value %d\n",inodeBlockFound.inodeSlot[k].size);
+			if (inodeBlockFound.inodeSlot[k].size == -1){
+				inodeIndex = i * 64 + k ;
+				return inodeIndex;
+			}	
 		}
-		if (inodeIndex > 0){
-					break;
-				}
 	}
 		
 	return inodeIndex;
@@ -440,9 +478,11 @@ int main(){
 	//createNewRootDirectory();
 	
 	//createNewRootDirectory();
-	int inodeIndex = createRootInodeFile();
-	printf("INODE INDEX : %d\n", inodeIndex);
-	int freeIndex = findFreeInode(-1);
+	int rootBlock = findRootInodeFile();
+	printf("BLOCK NUMBER OF ROOT : %d\n", rootBlock);
+	int newRootBlock = createRootInodeFile();
+	printf("WROTE ROOT BLOCK TO THIS BLOCK : %d\n ", newRootBlock);
+	int freeIndex = findFreeInodeIndex();
 	printf("FREE INODE INDEX : %d\n", freeIndex);
 	/*
 	int i;
