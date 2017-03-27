@@ -406,12 +406,12 @@ int findFreeInodeIndex(){
 // initialize file directory  and set all values to free, rwptr to 0 and  no inode values 
 void initializeFileDescriptorTable() {
 	int i;
-	fileDescriptor_t* tempfd = malloc(sizeof(fileDescriptor_t));
-	tempfd->free = 1;
-	tempfd->rwptr = 0;
-	tempfd->inode = -1;
+	fileDescriptor_t fd;
+	fd.free = -1;
+	fd.rwptr = 0;
+	fd.inode = -1;
 	for (i = 0; i < numberOfInodes; i++){
-		memcpy(&fdt[i], tempfd, sizeof(fileDescriptor_t));
+		fdt[i] = fd; 
 	}
 
 }
@@ -503,21 +503,84 @@ void mkssfs(int fresh){
 	printf("--------------------------------------------------------------------\n"); */
 }
 
+int findEntry(char *name){
+	int i;
+	// check if file is already in root directory then add to open file descriptor
+	for (i = 0; i < numberOfEntries ; i++){
+		if (strcmp(rootDirectory.entries[i].name, name) == 0){
+			printf("Found the entry : %s with inode Index : %d\n", name, rootDirectory.entries[i].inodeIndex);
+			return rootDirectory.entries[i].inodeIndex;
+		}		
+	}
+	return -1;
+}
+
+
+
+int ssfs_fopen(char *name){
+	int i;
+	int inodeIndex;
+	
+	//file name too big 
+	if (strlen(name) > 10){
+		return -1;
+	}
+	
+	// search root directory for file name
+	inodeIndex = findEntry(name);
+	if(inodeIndex == -1){
+		return -1;
+	}
+	
+	//check if fdt already has a file open, if so return index of fdt  * maybe change
+	for(i = 0; i < numberOfInodes;i++){
+		if(fdt[i].inode == inodeIndex){
+			return i;
+		}
+	}
+	
+	//check for free space in fdt and add inode index to the table if so  
+	for(i = 0; i < numberOfInodes; i++){
+		if(fdt[i].free == -1 ){
+			printf("There is enough free space\n");
+			fdt[i].inode = inodeIndex;
+			fdt[i].rwptr = 0;
+			fdt[i].free = 0;
+			return i;
+		}
+	}
+	
+	return -1;
+	
+}
+
+void displayFDT(){
+	int i;
+	for(i = 0; i < numberOfInodes; i++){
+		printf("FDT index : %d free : %d pointer : %d inode : %d\n", i, fdt[i].free,fdt[i].rwptr,fdt[i].inode);
+	}
+}
 
 int main(){
 	int i,k;
 	
 	//mkssfs(4);
-	mkssfs(0);
+	mkssfs(1);
 	//printf("NEW DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
  
-	//createNewRootDirectory();
-	printf("\n\n");
+	createNewRootDirectory();
+	printf("\n");
 	createFile("cake");
 	createFile("portal");
 	createFile("Catherine");
 	createFile("PERSONA");
 
+	ssfs_fopen("cake");
+	ssfs_fopen("portal");
+	ssfs_fopen("Catherine");
+	ssfs_fopen("PERSONA");
+	
+	//displayFDT();
 /*	
 	for (i = 0; i < numberOfEntries; i++){
 		printf("file : %s index : %d\n", rootDirectory.entries[i].name, rootDirectory.entries[i].inodeIndex);
