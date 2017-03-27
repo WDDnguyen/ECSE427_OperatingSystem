@@ -365,9 +365,10 @@ int createFile(char* fname){
 	for (i = 0; i < numberOfEntries; i++){
 		if (rootDirectory.entries[i].inodeIndex == -1){
 			rootDirectory.entries[i] = entry;
-			break;
 			//might have to write to the disk after commit change whenever 
-			write_block(sb.rootDirectoryBlockNumber,1, &rootDirectory);
+			write_blocks(sb.rootDirectoryBlockNumber,1, &rootDirectory);
+			break;
+			
 		}
 	}
 	
@@ -528,13 +529,16 @@ int ssfs_fopen(char *name){
 	
 	// search root directory for file name
 	inodeIndex = findEntry(name);
+	// if doesnt exist then create a new file 
 	if(inodeIndex == -1){
-		return -1;
+		createFile(name);
+		inodeIndex = findEntry(name); 
 	}
 	
 	//check if fdt already has a file open, if so return index of fdt  * maybe change
 	for(i = 0; i < numberOfInodes;i++){
 		if(fdt[i].inode == inodeIndex){
+			// need to adjust write pointer after writing into data 
 			return i;
 		}
 	}
@@ -542,7 +546,7 @@ int ssfs_fopen(char *name){
 	//check for free space in fdt and add inode index to the table if so  
 	for(i = 0; i < numberOfInodes; i++){
 		if(fdt[i].free == -1 ){
-			printf("There is enough free space\n");
+			//printf("There is enough free space\n");
 			fdt[i].inode = inodeIndex;
 			fdt[i].rwptr = 0;
 			fdt[i].free = 0;
@@ -551,6 +555,24 @@ int ssfs_fopen(char *name){
 	}
 	
 	return -1;
+	
+}
+
+int ssfs_close(int fileID){
+	int i;
+	
+	//invalid fileID
+	if(fileID < 0 || fileID >= numberOfInodes){
+		printf("invalid fileID\n");
+		return -1;
+	}
+	
+	// remove fdt open file
+	printf("close file ID : %d with inode : %d\n",fileID,fdt[fileID].inode);
+	fdt[fileID].inode = -1;
+	fdt[fileID].rwptr = 0;
+	fdt[fileID].free = -1;
+	return 0;	
 	
 }
 
@@ -579,6 +601,18 @@ int main(){
 	ssfs_fopen("portal");
 	ssfs_fopen("Catherine");
 	ssfs_fopen("PERSONA");
+	ssfs_fopen("meow");
+	ssfs_fopen("woof");
+	
+	ssfs_close(2);
+	ssfs_close(3);
+	
+	ssfs_fopen("ribbit");
+	ssfs_fopen("rarw");
+	ssfs_fopen("behhhh");
+	
+	ssfs_close(250);
+	ssfs_close(-250);
 	
 	//displayFDT();
 /*	
