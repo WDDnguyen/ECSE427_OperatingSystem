@@ -48,9 +48,9 @@ int Inodes;
 inode_t root;
 inode_t shadow[4];
 int lastShadow;
-int rootDirectoryBlockNumber; 
+int rootDirectoryBlockNumber[4]; 
 //filling up the super block with empty value
-char fill[680];
+char fill[668];
 } superblock_t;
 
 
