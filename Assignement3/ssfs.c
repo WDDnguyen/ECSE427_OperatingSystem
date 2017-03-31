@@ -10,12 +10,12 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
+
 /*STRUCTURE OF THE BLOCKS OF THE HARD DRIVE
 sb = 0
 FBM = 1
-WM = 2
-root directory = 3
-INODE BLOCK = 4 to 16 
+root directory = 2 - 5 
+INODE BLOCK = 6 to 18 
 rest is data blocks 
 
 */
@@ -70,6 +70,7 @@ void initializeInodeFiles(){
 	*/
 }
 
+/*
 void setInodeDirect(int index, int blockNumber){
 	int block = index / 16;
 	int slot = index % 16;
@@ -95,7 +96,7 @@ void getInode(int index){
 	printf("This is what the block is pointing right now : %d\n", inodeBlocks[block].inodeSlot[slot].direct[i]);
 	}
 }
-
+*/
 void initializeRootDirectory(){
 	int i;
 		
@@ -212,12 +213,12 @@ int clearWMbit(int blockNumber, int setBlockNumber){
 	wm.bytes[byte] = wm.bytes[byte] ^ (1 << bit); 
 	
 	// might need it but  have to make it writtable
-	/*
+	
 	int nbyte = setBlockNumber / 8;
 	int nbit = setBlockNumber % 8;
 
 	wm.bytes[nbyte] = wm.bytes[nbyte] ^ (1 << nbit);
-	 */
+	 
 }
 
 int clearBlockInformation(int blockNumber, int newBlockNumber){
@@ -235,6 +236,7 @@ int clearBlockInformation(int blockNumber, int newBlockNumber){
 	
 }
 
+/*
 int createNewRootDirectory(){
 	int blockNumber = FBMGetFreeBit();
 	int i;
@@ -277,10 +279,6 @@ int createRootInodeFile(int bn){
 	int newBlockNumber;
 	int blockNumber = findRootInodeFile(bn);
 	
-	/*inodeBlock_t inodeBlockFound;
-	read_blocks(blockNumber, 1, &inodeBlockFound);
-	*/
-	
 	
 	//find root direct index containing the block Number
 	for(i = 0 ; i < 13; i++){
@@ -312,7 +310,8 @@ int createRootInodeFile(int bn){
 	
 	return -2;
 }
-
+*/
+/*
 int findRootInodeFile(int bn){
 	int i,k,p;
 	//int inodeIndex = -5;
@@ -339,7 +338,7 @@ int findRootInodeFile(int bn){
 	return -1;
 	
 }
-
+*/
 int rootAddInode(int inodeIndex){
 	int i = inodeIndex / 16;
 	int k;
@@ -350,22 +349,19 @@ int rootAddInode(int inodeIndex){
 	}
 	newInode.size = 0;
 	
-	//inodeBlock_t inodeBlockFound;
-	//read_blocks(sb.root.direct[i],1,&inodeBlockFound);
-	
 	
 	for(k = 0 ; i<16; k++){
 		if (inodeBlocks[i].inodeSlot[k].size == -1){
 			inodeBlocks[i].inodeSlot[k] = newInode;
 			write_blocks(sb.root.direct[i], 1, &inodeBlocks[i]);
-			printf("added new inode file to j-node block : %d, inodeBlock : %d, index : %d\n", sb.root.direct[i],i, inodeIndex);
+			printf("added new inode file to j-node block : %d, inodeBlock : %d, slot : %d, index : %d\n", sb.root.direct[i],i,k, inodeIndex);
 			return 1;
 		} 
 	}
 return -1;	
 }
 
- // ASSUME NOT ALLOCATING DISK SPACE WHEN CREATING A FILE 
+
 int createFile(char* fname){
 	// might need to overwrite the index if too many entries
 	int i;
@@ -389,8 +385,6 @@ int createFile(char* fname){
 			break;
 		}
 	}
-	
-	// MIGHT NEED TO EVICT VALUE
 	
 	rootAddInode(freeIndex);
 	return 0;
@@ -427,20 +421,20 @@ int findFreeInodeIndex(){
 
 int allocateDataBlock(int inodeIndex){
 	// get j-node block 
+	
 	int i = inodeIndex / 16;
+
 	int slot = inodeIndex % 16;
+	
 	int newBlockNumber = FBMGetFreeBit();
 	int k;
 	
 	printf("inode Block Index : %d in slot : %d\n", i, slot);
 	
-	//inodeBlock_t inodeBlockFound;
-	//read_blocks(sb.root.direct[jnodeIndex] , 1 , &inodeBlockFound);
-	
-	for (k = 0; k < 14 ; i++){
+	for (k = 0; k < 14 ; k++){
 		if(inodeBlocks[i].inodeSlot[slot].direct[k] == -1){
 			inodeBlocks[i].inodeSlot[slot].direct[k] = newBlockNumber;
-			printf("Allocated data block : %d to inode block  : %d index slot : %d\n", newBlockNumber, i,slot);
+			printf("Allocated data block : %d to inodeBlock[] : %d slot : %d  direct  :%d \n", newBlockNumber, i,slot, k );
 			//Precaution
 			write_blocks(sb.root.direct[i],1, &inodeBlocks[i]);
 			return newBlockNumber;
@@ -657,12 +651,12 @@ void displayJnodeIndex(){
 void displayInodeBlocks(){
 	int i,k,p;
 	
-	for(i = 0; i <1 ; i++){
+	for(i = 0; i <3 ; i++){
 		printf("inode Block : %d\n",i);	 
-	for( k = 0; k < 16; k++){
-			printf("size : %d", inodeBlocks[i].inodeSlot[k].size);
-		for(p = 0; p < 14; p++){
-			//printf("Directory value : %d\n", inodeBlocks[i].inodeSlot[k].direct[p]);	 
+	for( k = 0; k < 3; k++){
+			printf("size : %d\n", inodeBlocks[i].inodeSlot[k].size);
+		for(p = 0; p < 5; p++){
+			printf("Directory value : %d\n", inodeBlocks[i].inodeSlot[k].direct[p]);	 
 		}
 		printf("\n");
 	}
@@ -677,34 +671,164 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 	
 	int bytesWritten;
 	int inodeIndex = fdt[fileID].inode;
+	printf("inodeIndex : %d\n", inodeIndex);
 	int i = inodeIndex / 16;
 	int slotIndex = inodeIndex % 16;
 	int size = inodeBlocks[i].inodeSlot[slotIndex].size;
-	int writeInDataBlock;	
+	
+	int writeInDataBlock;
+	int directNumber;	
+	// char to start writting from in a data block 
+	int k = size % 1024;
+	int currentBlock;
+	int p;
+
+
+	block_t write;
+	
 		
+	//check which block in the inode where the pointer is currently at 
+	currentBlock = fdt[fileID].rwptr / blockSize;
+	
+	int totalWritingSize = fdt[fileID].rwptr + length;		
+	int remaining = 0;
+	int numberOfBlocksToAllocate = 0;
+	int firstBlockDataLength;
+	int lastBlockDataLength;
+	
+	// check if file is going to overflow 
+	if (totalWritingSize > (currentBlock + 1) * blockSize){
+		// data to be written to fill up the current block 
+		firstBlockDataLength = blockSize - size;
+		// rest of data to be written in the other blocks 
+		remaining = length - firstBlockDataLength;
+		// need to allocate more blocks to satisfy write size
+		if (remaining > 0){
+			// need atleast 1 block to allocate 
+			numberOfBlocksToAllocate = (remaining / blockSize) + 1;	
+			lastBlockDataLength = remaining % blockSize;
+		}
+	}
+	
+	printf("size : %d\n", size);
+	
 	// IF CREATED NEW FILE 
 	if(size == 0){
+		int l;
 		allocateDataBlock(inodeIndex);
-		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[0]; 
-		write_blocks(writeInDataBlock, 1, &buf);
+		// know its the first direct element to be written in 
+		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[0];
+		
+		read_blocks(writeInDataBlock,1, &write);
+		memcpy(write.bytes,buf,length);
+		
+		printf("NEW FILE WRITE IN DATA BLOCK : %d\n", writeInDataBlock);
+		
+		write_blocks(writeInDataBlock, 1, &write);
 		inodeBlocks[i].inodeSlot[slotIndex].size += length;
 		// RECHECK
 		fdt[fileID].rwptr += length;
-	}	
+		return length;
+		
+	}else {
+	
+		// don't need to allocate new data block if enough spac 
+		if (numberOfBlocksToAllocate == 0){
+			printf("ENOUGH PLACE TO CONTAIN DATA\n");
+			directNumber = currentBlock;  
+			writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
+			read_blocks(writeInDataBlock,1, &write);
+			
+			memcpy(write.bytes + k,buf, length);
+			printf("EXISTING FILE WRITE IN DATA BLOCK : %d\n", writeInDataBlock);
+			write_blocks(writeInDataBlock, 1, &write);
+			
+			inodeBlocks[i].inodeSlot[slotIndex].size += length;
+			fdt[fileID].rwptr += length;
+			return length;
+		}
+		
+		else {
+		
+			printf("NUMBER OF BLOCKS TO ALLOCATE DATA : %d\n", numberOfBlocksToAllocate);
+			// need to allocate more blocks if the length of the write is going to be a lot 
+			
+			for(p = 0; p < numberOfBlocksToAllocate ; p++){
+				allocateDataBlock(inodeIndex);
+			}
+					
+			//search last block written 
+			//directNumber = fdt[fileID].rwptr / blockSize;
+			directNumber = currentBlock;
+			
+			printf("THIS HAS TO BE %d\n", currentBlock);
+			writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
+			read_blocks(writeInDataBlock,1, &write);
+			
+			// start by writing to the current block;
+			int dataLength = firstBlockDataLength; 
+			k = size % 1024;
+			memcpy(write.bytes + k, buf, dataLength);
+			write_blocks(writeInDataBlock, 1, &write);
+			
+			int n = 0;
+			// now need to write to the completely filled 
+			if (numberOfBlocksToAllocate > 1){
+				
+				for (n = 1; n < numberOfBlocksToAllocate ; n++){
+					
+				writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
+				printf("full block to write buffer : %d\n", writeInDataBlock);
+				read_blocks(writeInDataBlock, 1, &write);
+				memcpy(write.bytes,buf,blockSize);
+				//memcpy(write.bytes, buf[((currentBlock - 1) * blockSize) + dataLength], blockSize);
+				write_blocks(writeInDataBlock, 1, &write);
+				                         
+				}
+				
+			}
+			printf("CURRENT BLOCK : %d\n", currentBlock);
+			
+			// write to the last block  and update pointer 
+			int lastDataLength = lastBlockDataLength;
+				
+			writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
+			
+			printf("WRITING IN DATA BLOCK : %d\n", writeInDataBlock);
+			//displayInodeBlocks();
+			
+			read_blocks(writeInDataBlock,1, &write);
+			memcpy(write.bytes,buf, lastBlockDataLength);
+			//memcpy(write.bytes, buf[((currentBlock - 1) * blockSize) + dataLength], lastDataLength);
+			write_blocks(writeInDataBlock, 1, &write);
+			
+			inodeBlocks[i].inodeSlot[slotIndex].size += length;
+			fdt[fileID].rwptr += length;
+			return length;
+			}
+		
+	}
+		
+	return -1;
 }
 
 
 int main(){
 	int i,k,p;
-	int fileID = 2;  
+	int fileID = 0;  
 	char * buffer = "BAZUSO"; 
+	char * buffer1 = "THE 30 MAN SLAYER";
+	char * buffer2 = "GUTS";
 	int length = strlen(buffer);
 	
+	
+	char *name = "ArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBs";
+	char *name1 = "BrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBs";
 	//mkssfs(4);
 	mkssfs(1);
 	//printf("NEW DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber);
  
-	createNewRootDirectory();
+	//createNewRootDirectory();
 	printf("\n");
 	
 	//displayJnodeIndex();
@@ -714,78 +838,78 @@ int main(){
 	createFile("Catherine");
 	createFile("PERSONA");
 	
-	
-//	displayRootDirectoryEntries();
-
+	//displayRootDirectoryEntries();
 
 	ssfs_fopen("cake");
 	ssfs_fopen("portal");
 	ssfs_fopen("Catherine");
 	ssfs_fopen("PERSONA");
 	
-	//ssfs_fwrite(3,buffer, length);
 	
+	ssfs_fwrite(fileID, buffer1, strlen(buffer1));
+	ssfs_fwrite(fileID, buffer, length);
+	ssfs_fwrite(fileID, buffer2, strlen(buffer2));
+	ssfs_fwrite(fileID, buffer, length);
+	ssfs_fwrite(fileID, name, strlen(name));
+
+	
+	//ssfs_fwrite(3,buffer, length);
+	/*
 	ssfs_fopen("meow");
 	ssfs_fopen("woof");
 	
-	//ssfs_close(2);
-	//ssfs_close(3);
+	ssfs_close(2);
+	ssfs_close(3);
 	
 	ssfs_fopen("ribbit");
 	ssfs_fopen("rarw");
 	ssfs_fopen("behhhh");
 	
-	//ssfs_fopen("meow");
-	//ssfs_fopen("woof");
+	ssfs_fopen("meow");
+	ssfs_fopen("woof");
 	
 	
-	//ssfs_close(250);
-	//ssfs_close(-250); 
+	ssfs_close(250);
+
+	ssfs_close(-250); */
 	
-	ssfs_fwrite(fileID, buffer, length);
+	
+	/*
+	unsigned char b[1024];
+	read_blocks(19,1,b);
+	
+	
+	for(i=0; i < 1024; i++){
+		printf("%c",b[i]);
+	}
+	*/
+	
+	printf("\n---------------------------------------------------------\n");
+	block_t test;
+	
+	
+	read_blocks(17,1,&test);
+	
+	for(i=0; i < 1024; i++){
+		printf("%c",test.bytes[i]);
+	}
+	
+	read_blocks(18,1,&test);
+	printf("\n---------------------------------------------------------\n");
+	for(i=0; i < 1024; i++){
+		printf("%c",test.bytes[i]);
+	}
+	read_blocks(19,1,&test);
+	
+	printf("\n---------------------------------------------------------\n");
+	for(i=0; i < 1024; i++){
+		printf("%c",test.bytes[i]);
+	}
+	
+	
+		
 	//displayFDT();
 	//displayInodeBlocks();
-	
-	//displayFDT();
-/*	
-	for (i = 0; i < numberOfEntries; i++){
-		printf("file : %s index : %d\n", rootDirectory.entries[i].name, rootDirectory.entries[i].inodeIndex);
-	}
-	
-	inodeBlock_t ib;
-	
-	read_blocks(18,1, &ib);
-	
-	for(i =0 ; i<16;i++){
-		printf("value : %d\n", ib.inodeSlot[i].size);
-	}
-*/
-	//createNewRootDirectory();
-	/*int rootBlock = findRootInodeFile();
-	printf("BLOCK NUMBER OF ROOT : %d\n", rootBlock);
-	int newRootBlock = createRootInodeFile();
-	printf("WROTE ROOT BLOCK TO THIS BLOCK : %d\n ", newRootBlock);
-	*/
-	//int freeIndex = findFreeInodeIndex();
-	//printf("FREE INODE INDEX : %d\n", freeIndex);
-	/*
-	printf("--------------------------------------------------------------------\n");
-	for(i = 0; i < 10; i++){
-		for(k = 0 ; k < 8 ;k++){
-		printf("%u ", !!(fbm.bytes[i] & (1 << k)));
-		}
-		printf("\n");
-		
-	}
-	printf("--------------------------------------------------------------------\n");
-	for(i = 0; i < 10; i++){
-		for(k = 0 ; k < 8 ;k++){
-		printf("%u ", !!(wm.bytes[i] & (1 << k)));
-		}
-		printf("\n");
-		
-	}
-	printf("--------------------------------------------------------------------\n"); 
-	*/
+
 	return 0;
 }
