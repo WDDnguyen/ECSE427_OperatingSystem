@@ -120,7 +120,7 @@ int FBMGetFreeBit(){
 		for (k = 0; k < 8 ; k++){
 			if ((fbm.bytes[i] & (1 << k)) == (1 << k)){
 				
-				printf("Found a free bit at : %d\n", i * 8 + k);
+				//printf("Found a free bit at : %d\n", i * 8 + k);
 				// set the bit to 0 
 				fbm.bytes[i] = fbm.bytes[i] ^ (1 << k);
 				return (i * 8 + k); 
@@ -338,13 +338,15 @@ void mkssfs(int fresh){
 }
 
 int findEntry(char *name){
-	int i;
+	int i,k;
 	// check if file is already in root directory then add to open file descriptor
-	for (i = 0; i < numberOfEntries ; i++){
-		if (strcmp(rootDirectory[0].entries[i].name, name) == 0){
-			printf("Found the entry : %s with inode Index : %d\n", name, rootDirectory[0].entries[i].inodeIndex);
-			return rootDirectory[0].entries[i].inodeIndex;
-		}		
+	for (k = 0 ; k < 4; k ++){
+		for (i = 0; i < numberOfEntries ; i++){
+			if (strcmp(rootDirectory[k].entries[i].name, name) == 0){
+				printf("Found the entry : %s with inode Index : %d\n", name, rootDirectory[0].entries[i].inodeIndex);
+				return rootDirectory[k].entries[i].inodeIndex;
+			}		
+		}
 	}
 	return -1;
 }
@@ -463,13 +465,17 @@ void displayInodeBlocks(){
 	}
  }
  
- 
- 
- 
-	
 }
+
 // error checking needed 
 int ssfs_fwrite(int fileID, char *buf, int length){
+	
+	// verify if file ID exist 
+	if (fdt[fileID].inode == -1){
+		printf("ERROR : Not valid file ID\n");
+		return -1;
+	}
+	
 	
 	int bytesWritten;
 	int inodeIndex = fdt[fileID].inode;
@@ -486,8 +492,7 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 	int p;
 
 
-	block_t write;
-	
+	block_t write;	
 		
 	//check which block in the inode where the pointer is currently at 
 	currentBlock = fdt[fileID].rwptr / blockSize;
@@ -513,6 +518,9 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 	}
 	
 	printf("size : %d\n", size);
+		
+	//WARNING WILL BREAK IF NEW FILE WITH A LENGTH > 1024   NEED TO FIX 
+
 	
 	// IF CREATED NEW FILE 
 	if(size == 0){
@@ -563,7 +571,7 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 			//directNumber = fdt[fileID].rwptr / blockSize;
 			directNumber = currentBlock;
 			
-			printf("THIS HAS TO BE %d\n", currentBlock);
+			//printf("THIS HAS TO BE %d\n", currentBlock);
 			writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
 			read_blocks(writeInDataBlock,1, &write);
 			
@@ -588,7 +596,7 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 				}
 				
 			}
-			printf("CURRENT BLOCK : %d\n", currentBlock);
+			//printf("CURRENT BLOCK : %d\n", currentBlock);
 			
 			// write to the last block  and update pointer 
 			int lastDataLength = lastBlockDataLength;
@@ -635,19 +643,17 @@ int main(){
 	//displayJnodeIndex();
 	
 	//displayFBM();
-	displayInodeBlocks();
+	//displayInodeBlocks();
 	
 	createFile("cake");
 	createFile("portal");
 	createFile("Catherine");
 	createFile("PERSONA");
 	
-	displayInodeBlocks();
 	
-	//displayFBM();
 
 
-	/*
+	
 	//displayRootDirectoryEntries();
 
 	ssfs_fopen("cake");
@@ -655,15 +661,6 @@ int main(){
 	ssfs_fopen("Catherine");
 	ssfs_fopen("PERSONA");
 	
-	
-	ssfs_fwrite(fileID, buffer1, strlen(buffer1));
-	ssfs_fwrite(fileID, buffer, length);
-	ssfs_fwrite(fileID, buffer2, strlen(buffer2));
-	ssfs_fwrite(fileID, buffer, length);
-	ssfs_fwrite(fileID, name, strlen(name));
-
-	
-	//ssfs_fwrite(3,buffer, length);
 	
 	ssfs_fopen("meow");
 	ssfs_fopen("woof");
@@ -679,10 +676,30 @@ int main(){
 	ssfs_fopen("woof");
 	
 	
-	ssfs_close(250);
-
-	ssfs_close(-250); */
+	ssfs_fwrite(fileID, buffer1, strlen(buffer1));
+	ssfs_fwrite(fileID, buffer, length);
+	ssfs_fwrite(fileID, buffer2, strlen(buffer2));
+	ssfs_fwrite(fileID, buffer, length);
 	
+	ssfs_fwrite(fileID, name, strlen(name));
+	ssfs_fwrite(fileID, buffer1, strlen(buffer1));
+	ssfs_fwrite(fileID, buffer, length);
+	ssfs_fwrite(fileID, buffer2, strlen(buffer2));
+	
+	
+	ssfs_fwrite(2, buffer1, strlen(buffer1));
+	ssfs_fwrite(3, buffer, length);
+	ssfs_fwrite(4, buffer2, strlen(buffer2));
+	ssfs_fwrite(5, buffer, length);
+	
+	
+	//ssfs_fwrite(6, name, strlen(name));
+	ssfs_fwrite(7, buffer1, strlen(buffer1));
+	//ssfs_fwrite(8, buffer, length);
+	//ssfs_fwrite(9, buffer2, strlen(buffer2));
+	
+		
+	displayFDT();
 	
 	/*
 	unsigned char b[1024];
