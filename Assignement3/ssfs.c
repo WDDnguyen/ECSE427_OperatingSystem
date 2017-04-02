@@ -537,7 +537,7 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 	
 	int bytesWritten;
 	int inodeIndex = fdt[fileID].inode;
-	printf("inodeIndex : %d\n", inodeIndex);
+	//printf("inodeIndex : %d\n", inodeIndex);
 	int i = inodeIndex / 13;
 	int slotIndex = inodeIndex % 13;
 	int size = inodeBlocks[i].inodeSlot[slotIndex].size;
@@ -574,107 +574,87 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 		}
 	}
 	
-	printf("size : %d\n", size);
-		
-	//WARNING WILL BREAK IF NEW FILE WITH A LENGTH > 1024   NEED TO FIX 
-
-	// IF CREATED NEW FILE 
+	// If new file then allocate atleast 1 block 
 	if(size == 0){
-		int l;
+		printf("New file\n");
 		allocateDataBlock(inodeIndex);
-		// know its the first direct element to be written in 
-		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[0];
+	}
+	
+	// don't need to allocate new data block if enough spac 
+	if (numberOfBlocksToAllocate == 0){
 		
+		printf("ENOUGH PLACE TO CONTAIN DATA\n");
+		directNumber = currentBlock;  
+		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
 		read_blocks(writeInDataBlock,1, &write);
-		memcpy(write.bytes,buf,length);
 		
-		printf("NEW FILE WRITE IN DATA BLOCK : %d\n", writeInDataBlock);
+		memcpy(write.bytes + k,buf, length);
 		
+		//printf("EXISTING FILE WRITE IN DATA BLOCK : %d\n", writeInDataBlock);
 		write_blocks(writeInDataBlock, 1, &write);
+		
 		inodeBlocks[i].inodeSlot[slotIndex].size += length;
-		// RECHECK
 		fdt[fileID].rwptr += length;
 		return length;
-		
-	}else {
+	}
 	
-		// don't need to allocate new data block if enough spac 
-		if (numberOfBlocksToAllocate == 0){
-			printf("ENOUGH PLACE TO CONTAIN DATA\n");
-			directNumber = currentBlock;  
-			writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
-			read_blocks(writeInDataBlock,1, &write);
-			
-			memcpy(write.bytes + k,buf, length);
-			
-			printf("EXISTING FILE WRITE IN DATA BLOCK : %d\n", writeInDataBlock);
-			write_blocks(writeInDataBlock, 1, &write);
-			
-			inodeBlocks[i].inodeSlot[slotIndex].size += length;
-			fdt[fileID].rwptr += length;
-			return length;
+	else {
+	
+		printf("NUMBER OF BLOCKS TO ALLOCATE DATA : %d\n", numberOfBlocksToAllocate);
+		// need to allocate more blocks if the length of the write is going to be a lot 
+		
+		for(p = 0; p < numberOfBlocksToAllocate ; p++){
+			allocateDataBlock(inodeIndex);
 		}
-		
-		else {
-		
-			printf("NUMBER OF BLOCKS TO ALLOCATE DATA : %d\n", numberOfBlocksToAllocate);
-			// need to allocate more blocks if the length of the write is going to be a lot 
-			
-			for(p = 0; p < numberOfBlocksToAllocate ; p++){
-				allocateDataBlock(inodeIndex);
-			}
-					
-			//search last block written 
-			//directNumber = fdt[fileID].rwptr / blockSize;
-			directNumber = currentBlock;
-			
-			//printf("THIS HAS TO BE %d\n", currentBlock);
-			writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
-			read_blocks(writeInDataBlock,1, &write);
-			
-			// start by writing to the current block;
-			int dataLength = firstBlockDataLength; 
-			k = size % 1024;
-			memcpy(write.bytes + k, buf, dataLength);
-			write_blocks(writeInDataBlock, 1, &write);
-			
-			int n = 0;
-			// now need to write to the completely filled 
-			if (numberOfBlocksToAllocate > 1){
 				
-				for (n = 1; n < numberOfBlocksToAllocate ; n++){
-					
-				writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
-				printf("full block to write buffer : %d\n", writeInDataBlock);
-				read_blocks(writeInDataBlock, 1, &write);
-				memcpy(write.bytes, buf +((currentBlock - 1 + n) * blockSize) + dataLength, blockSize);
-				write_blocks(writeInDataBlock, 1, &write);
-				                         
-				}
-				
-			}
-			//printf("CURRENT BLOCK : %d\n", currentBlock);
+		//search last block written 
+		//directNumber = fdt[fileID].rwptr / blockSize;
+		directNumber = currentBlock;
+		
+		//printf("THIS HAS TO BE %d\n", currentBlock);
+		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
+		read_blocks(writeInDataBlock,1, &write);
+		
+		// start by writing to the current block;
+		int dataLength = firstBlockDataLength; 
+		k = size % 1024;
+		memcpy(write.bytes + k, buf, dataLength);
+		write_blocks(writeInDataBlock, 1, &write);
+		
+		int n = 0;
+		// now need to write to the completely filled 
+		if (numberOfBlocksToAllocate > 1){
 			
-			// write to the last block  and update pointer 
-			int lastDataLength = lastBlockDataLength;
+			for (n = 1; n < numberOfBlocksToAllocate ; n++){
 				
 			writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
-			
-			printf("WRITING IN DATA BLOCK : %d\n", writeInDataBlock);
-			//displayInodeBlocks();
-			
-			read_blocks(writeInDataBlock,1, &write);
-			
-			memcpy(&(write.bytes), buf + ((currentBlock - 1 + n) * blockSize) + dataLength, lastDataLength);
+			printf("full block to write buffer : %d\n", writeInDataBlock);
+			read_blocks(writeInDataBlock, 1, &write);
+			memcpy(write.bytes, buf +((currentBlock - 1 + n) * blockSize) + dataLength, blockSize);
 			write_blocks(writeInDataBlock, 1, &write);
-			
-			inodeBlocks[i].inodeSlot[slotIndex].size += length;
-			fdt[fileID].rwptr += length;
-			return length;
+									 
 			}
+			
+		}
+		//printf("CURRENT BLOCK : %d\n", currentBlock);
 		
-	}
+		// write to the last block  and update pointer 
+		int lastDataLength = lastBlockDataLength;
+			
+		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
 		
+		printf("WRITING IN DATA BLOCK : %d\n", writeInDataBlock);
+		//displayInodeBlocks();
+		
+		read_blocks(writeInDataBlock,1, &write);
+		
+		memcpy(&(write.bytes), buf + ((currentBlock - 1 + n) * blockSize) + dataLength, lastDataLength);
+		write_blocks(writeInDataBlock, 1, &write);
+		
+		inodeBlocks[i].inodeSlot[slotIndex].size += length;
+		fdt[fileID].rwptr += length;
+		return length;
+		}		
 	return -1;
 }
 
@@ -916,7 +896,6 @@ int main(){
 	ssfs_fopen("Catherine");
 	ssfs_fopen("PERSONA");
 	
-	
 	ssfs_fopen("meow");
 	ssfs_fopen("woof");
 	
@@ -930,16 +909,16 @@ int main(){
 	ssfs_fopen("meow");
 	ssfs_fopen("woof");
 	
+	printf("\n---------------------------------------------------------\n");
 	
-	ssfs_fwrite(fileID, buffer1, strlen(buffer1));
-	ssfs_fwrite(fileID, buffer, length);
-	ssfs_fwrite(fileID, buffer2, strlen(buffer2));
-	ssfs_fwrite(fileID, buffer, length);
-	
+	//ssfs_fwrite(fileID, buffer1, strlen(buffer1));
+	//ssfs_fwrite(fileID, buffer, length);
+	//ssfs_fwrite(fileID, buffer2, strlen(buffer2));
+	//ssfs_fwrite(fileID, buffer, length);
 	ssfs_fwrite(fileID, name, strlen(name));
 	
 	printf("\n---------------------------------------------------------\n");
-	
+	/*
 	ssfs_remove("cake");
 
 	printf("\n---------------------------------------------------------\n");
