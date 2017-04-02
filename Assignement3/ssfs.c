@@ -264,6 +264,7 @@ void initializeFileDescriptorTable() {
 	fd.free = -1;
 	fd.rwptr = 0;
 	fd.inode = -1;
+	fd.readptr = 0;
 	for (i = 0; i < numberOfInodes; i++){
 		fdt[i] = fd; 
 	}
@@ -369,10 +370,16 @@ int ssfs_fopen(char *name){
 		inodeIndex = findEntry(name); 
 	}
 	
+	int block = fdt[i].inode/16; 
+	int slotIndex = fdt[i].inode % 16;
+	int size = inodeBlocks[block].inodeSlot[slotIndex].size;
+	
 	//check if fdt already has a file open, if so return index of fdt  * maybe change
 	for(i = 0; i < numberOfInodes;i++){
 		if(fdt[i].inode == inodeIndex){
-			// need to adjust write pointer after writing into data 
+			// need to adjust write pointer to last written file  
+			fdt[i].rwptr = size;
+			fdt[i].readptr = 0;
 			return i;
 		}
 	}
@@ -384,6 +391,8 @@ int ssfs_fopen(char *name){
 			fdt[i].inode = inodeIndex;
 			fdt[i].rwptr = 0;
 			fdt[i].free = 0;
+			// when adidng the file into the fdt   put the write pointer to the last given ifle 
+			fdt[i].rwptr = size;
 			
 			return i;
 		}
@@ -421,7 +430,7 @@ void displayFDT(){
 	int i;
 	// rechange to number of inodes
 	for(i = 0; i < 64; i++){
-		printf("FDT index : %d free : %d pointer : %d inode : %d\n", i, fdt[i].free,fdt[i].rwptr,fdt[i].inode);
+		printf("FDT index : %d free : %d write pointer : %d  read pointer : %d inode : %d\n", i, fdt[i].free,fdt[i].rwptr, fdt[i].readptr, fdt[i].inode);
 	}
 }
 
@@ -467,6 +476,56 @@ void displayInodeBlocks(){
  
 }
 
+int ssfs_frseek(int fileID, int loc){
+	// check if fileID is valid
+	
+	if (loc < 0){
+		printf("invalid location \n");
+		return -1;
+	}
+	
+	if(fileID < 0 || fileID >= numberOfInodes){
+		printf("invalid fileID\n");
+		return -1;
+	}
+	
+	
+	if (fdt[fileID].free == -1){
+		printf("Invalid file ID for read seeking");
+		return -1;
+	}
+	
+	fdt[fileID].readptr = loc;
+	return 0;
+	
+}
+
+int ssfs_fwseek(int fileID, int loc){
+	
+	// check if fileID is valid
+	
+	if (loc < 0){
+		printf("invalid location \n");
+		return -1;
+	}
+	
+	if(fileID < 0 || fileID >= numberOfInodes){
+		printf("invalid fileID\n");
+		return -1;
+	}
+	
+	
+	if (fdt[fileID].free == -1){
+		printf("Invalid file ID for read seeking");
+		return -1;
+	}
+	
+	fdt[fileID].rwptr = loc;
+	return 0;
+	
+	
+}
+
 // error checking needed 
 int ssfs_fwrite(int fileID, char *buf, int length){
 	
@@ -475,7 +534,6 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 		printf("ERROR : Not valid file ID\n");
 		return -1;
 	}
-	
 	
 	int bytesWritten;
 	int inodeIndex = fdt[fileID].inode;
@@ -521,7 +579,6 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 		
 	//WARNING WILL BREAK IF NEW FILE WITH A LENGTH > 1024   NEED TO FIX 
 
-	
 	// IF CREATED NEW FILE 
 	if(size == 0){
 		int l;
@@ -550,6 +607,7 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 			read_blocks(writeInDataBlock,1, &write);
 			
 			memcpy(write.bytes + k,buf, length);
+			
 			printf("EXISTING FILE WRITE IN DATA BLOCK : %d\n", writeInDataBlock);
 			write_blocks(writeInDataBlock, 1, &write);
 			
@@ -608,7 +666,7 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 			
 			read_blocks(writeInDataBlock,1, &write);
 			
-			memcpy(write.bytes, buf + ((currentBlock - 1 + n) * blockSize) + dataLength, lastDataLength);
+			memcpy(&(write.bytes), buf + ((currentBlock - 1 + n) * blockSize) + dataLength, lastDataLength);
 			write_blocks(writeInDataBlock, 1, &write);
 			
 			inodeBlocks[i].inodeSlot[slotIndex].size += length;
@@ -620,6 +678,160 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 		
 	return -1;
 }
+
+int ssfs_fread(int fileID, char *buf, int length){
+	
+	// verify if file ID exist 
+	if (fdt[fileID].inode == -1){
+		printf("ERROR : Not valid file ID\n");
+		return -1;
+	}
+	
+	int bytesWritten;
+	int inodeIndex = fdt[fileID].inode;
+	printf("inodeIndex : %d\n", inodeIndex);
+	int i = inodeIndex / 16;
+	int slotIndex = inodeIndex % 16;
+	int size = inodeBlocks[i].inodeSlot[slotIndex].size;
+	
+	int readInDataBlock;
+	int directNumber;	
+	
+	
+	// char to start writting from in a data block 
+	int k = size % 1024;
+	int currentBlock = 0;
+
+	int p;
+	block_t read;	
+	
+	//check which block in the inode where the pointer is currently at 
+	printf("READ POINTER CURRENTLY AT :%d\n", fdt[fileID].readptr);
+	currentBlock = fdt[fileID].readptr / blockSize;
+	
+	int totalReadSize = fdt[fileID].readptr + length;		
+	int remaining = 0;
+	int numberOfBlocksToRead = 0;
+	int firstBlockDataLength;
+	int lastBlockDataLength;
+	
+	// check if file is going to overflow 
+	if (totalReadSize > (currentBlock + 1) * blockSize){
+		// data to be read in the current block 
+		firstBlockDataLength = blockSize - fdt[fileID].readptr ;
+		// rest of data to be written in the other blocks 
+		remaining = length - firstBlockDataLength;
+		// need to read blocks if remaining is bigger than 0 
+		if (remaining > 0){
+			// need atleast 1 extra block to read
+			numberOfBlocksToRead = (remaining / blockSize) + 1;	
+			lastBlockDataLength = remaining % blockSize;
+		}
+	}
+	
+	//If the read is much bigger than the size of the block   
+	if(size < length ){
+		printf("read length is more than size\n");
+		return -1;	
+	}
+	else {
+	
+		// don't need to allocate new data block if enough space in the block  
+		if (numberOfBlocksToRead == 0){
+			printf("ENOUGH PLACE TO READ DATA\n");
+			directNumber = currentBlock;  
+			readInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
+			
+			read_blocks(readInDataBlock,1, &read);
+
+			printf("\n--------------------------------------\n");
+			printf(" length of read : %d\n", length);
+			printf("\n--------------------------------------\n");
+		
+			char block[length];
+			int z;
+			int pointer = fdt[fileID].readptr;
+			
+			memcpy(block, read.bytes + pointer, length);
+			block[length] = '\0';
+			
+			for( z = 0 ; z < length; z++){
+				printf("%c",block[z]);
+			}
+			
+			strcpy(buf,block);
+			printf("\n--------------------------------------\n");
+		
+			fdt[fileID].readptr += length;
+			return length;
+		}
+		
+		else {
+		
+			printf("NUMBER OF BLOCKS TO READ : %d\n", numberOfBlocksToRead);
+			
+			int z; 
+			directNumber = currentBlock;
+			
+			readInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
+			read_blocks(readInDataBlock,1, &read);
+			
+			// start by writing to the current block;
+			int dataLength = firstBlockDataLength;
+			printf("DataLength : %d\n", dataLength);
+			k = size % 1024;
+			
+			char block[length + 1];
+			
+			memcpy(block, read.bytes, dataLength);
+			
+			int n = 1;
+			// now need to write to the completely filled 
+			if (numberOfBlocksToRead > 1){
+				
+				for (n = 1; n < numberOfBlocksToRead ; n++){
+					
+				readInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
+				printf("full block to READ buffer : %d\n", readInDataBlock);
+				read_blocks(readInDataBlock, 1, &read);
+				
+				memcpy(block + ((currentBlock - 1 + n) * blockSize) + dataLength , read.bytes, blockSize);
+				                         
+				}
+				
+			}
+			
+			// read the last block  and update pointer 
+			int lastDataLength = lastBlockDataLength;
+				
+			readInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
+			
+			printf("Read IN DATA BLOCK : %d\n", readInDataBlock);
+			//displayInodeBlocks();
+			
+			read_blocks(readInDataBlock,1, &read);
+			
+			memcpy(block + ((currentBlock - 1 + n) * blockSize) + dataLength,read.bytes, lastDataLength);
+			
+			inodeBlocks[i].inodeSlot[slotIndex].size;
+			fdt[fileID].readptr += length;
+			
+			block[length] = '\0';
+			
+			strcpy(buf,block);
+			
+			return length;
+			}
+		
+	}
+	
+
+	
+	return -1; 
+}
+
+
+
 
 
 int main(){
@@ -682,24 +894,34 @@ int main(){
 	ssfs_fwrite(fileID, buffer, length);
 	
 	ssfs_fwrite(fileID, name, strlen(name));
-	ssfs_fwrite(fileID, buffer1, strlen(buffer1));
-	ssfs_fwrite(fileID, buffer, length);
-	ssfs_fwrite(fileID, buffer2, strlen(buffer2));
+	//ssfs_fwrite(fileID, buffer1, strlen(buffer1));
+	//ssfs_fwrite(fileID, buffer, length);
+	//ssfs_fwrite(fileID, buffer2, strlen(buffer2));
 	
+	printf("\n---------------------------------------------------------\n");
+	char *rd = (char*) malloc(blockSize * 16);
 	
-	ssfs_fwrite(2, buffer1, strlen(buffer1));
-	ssfs_fwrite(3, buffer, length);
-	ssfs_fwrite(4, buffer2, strlen(buffer2));
-	ssfs_fwrite(5, buffer, length);
+	ssfs_fread(fileID,rd,blockSize*2 + 100);
+	//ssfs_fread(fileID,rd, 15);
+	printf("read : %s length : %zu\n",rd,strlen(rd));
+
+	//ssfs_fread(fileID,rd, 10);
+	//printf("read :%s length : %zu\n",rd,strlen(rd));
+	free(rd);
+	
+	//ssfs_fwrite(2, buffer1, strlen(buffer1));
+	//ssfs_fwrite(3, buffer, length);
+	//ssfs_fwrite(4, buffer2, strlen(buffer2));
+	//ssfs_fwrite(5, buffer, length);
 	
 	
 	//ssfs_fwrite(6, name, strlen(name));
-	ssfs_fwrite(7, buffer1, strlen(buffer1));
+	//ssfs_fwrite(7, buffer1, strlen(buffer1));
 	//ssfs_fwrite(8, buffer, length);
 	//ssfs_fwrite(9, buffer2, strlen(buffer2));
 	
 		
-	displayFDT();
+	//displayFDT();
 	
 	/*
 	unsigned char b[1024];
@@ -710,9 +932,9 @@ int main(){
 		printf("%c",b[i]);
 	}
 	
+	block_t test;
 	
 	printf("\n---------------------------------------------------------\n");
-	block_t test;
 	
 	
 	read_blocks(17,1,&test);
@@ -720,6 +942,8 @@ int main(){
 	for(i=0; i < 1024; i++){
 		printf("%c",test.bytes[i]);
 	}
+	
+	block_t test;
 	
 	read_blocks(18,1,&test);
 	printf("\n---------------------------------------------------------\n");
@@ -740,10 +964,10 @@ int main(){
 		printf("%c",test.bytes[i]);
 	}
 	
-	
+	*/
 		
 	//displayFDT();
 	//displayInodeBlocks();
-*/
+
 	return 0;
 }
