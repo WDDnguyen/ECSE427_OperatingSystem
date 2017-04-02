@@ -17,7 +17,6 @@ FBM = 1
 root directory = 2 - 5 
 INODE BLOCK = 6 to 18 
 rest is data blocks 
-
 */
 
 superblock_t sb;
@@ -33,7 +32,6 @@ block_t writeBlock;
 void initializeInodeFiles(){
 	int i;
 	int k;
-	
 	
 	inode_t tempInode;
 	tempInode.size = -1;
@@ -137,6 +135,7 @@ int setFBMbit(int blockNumber){
 	int byte = blockNumber / 8;
 	int bit = blockNumber % 8;
 	fbm.bytes[byte] = fbm.bytes[byte] ^ (1 << bit); 
+	printf("remove block :%d from fbm \n", blockNumber);
 	  
 }
 
@@ -151,7 +150,7 @@ int clearFBMbit(int blockNumber){
 }
 
 int rootAddInode(int inodeIndex){
-	int i = inodeIndex / 16;
+	int i = inodeIndex / 13;
 	int k;
 	inode_t newInode;
 	
@@ -235,9 +234,9 @@ int findFreeInodeIndex(){
 int allocateDataBlock(int inodeIndex){
 	// get j-node block 
 	
-	int i = inodeIndex / 16;
+	int i = inodeIndex / 13;
 
-	int slot = inodeIndex % 16;
+	int slot = inodeIndex % 13;
 	
 	int newBlockNumber = FBMGetFreeBit();
 	int k;
@@ -421,6 +420,7 @@ int ssfs_close(int fileID){
 	printf("close file ID : %d with inode : %d\n",fileID,fdt[fileID].inode);
 	fdt[fileID].inode = -1;
 	fdt[fileID].rwptr = 0;
+	fdt[fileID].readptr = 0;
 	fdt[fileID].free = -1;
 	return 0;	
 	
@@ -538,8 +538,8 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 	int bytesWritten;
 	int inodeIndex = fdt[fileID].inode;
 	printf("inodeIndex : %d\n", inodeIndex);
-	int i = inodeIndex / 16;
-	int slotIndex = inodeIndex % 16;
+	int i = inodeIndex / 13;
+	int slotIndex = inodeIndex % 13;
 	int size = inodeBlocks[i].inodeSlot[slotIndex].size;
 	
 	int writeInDataBlock;
@@ -548,7 +548,6 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 	int k = size % 1024;
 	int currentBlock;
 	int p;
-
 
 	block_t write;	
 		
@@ -564,7 +563,7 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 	// check if file is going to overflow 
 	if (totalWritingSize > (currentBlock + 1) * blockSize){
 		// data to be written to fill up the current block 
-		firstBlockDataLength = blockSize - size;
+		firstBlockDataLength = blockSize - k;
 		// rest of data to be written in the other blocks 
 		remaining = length - firstBlockDataLength;
 		// need to allocate more blocks to satisfy write size
@@ -690,8 +689,8 @@ int ssfs_fread(int fileID, char *buf, int length){
 	int bytesWritten;
 	int inodeIndex = fdt[fileID].inode;
 	printf("inodeIndex : %d\n", inodeIndex);
-	int i = inodeIndex / 16;
-	int slotIndex = inodeIndex % 16;
+	int i = inodeIndex / 13;
+	int slotIndex = inodeIndex % 13;
 	int size = inodeBlocks[i].inodeSlot[slotIndex].size;
 	
 	int readInDataBlock;
@@ -700,7 +699,7 @@ int ssfs_fread(int fileID, char *buf, int length){
 	
 	// char to start writting from in a data block 
 	int k = size % 1024;
-	int currentBlock = 0;
+	int currentBlock;
 
 	int p;
 	block_t read;	
@@ -718,7 +717,7 @@ int ssfs_fread(int fileID, char *buf, int length){
 	// check if file is going to overflow 
 	if (totalReadSize > (currentBlock + 1) * blockSize){
 		// data to be read in the current block 
-		firstBlockDataLength = blockSize - fdt[fileID].readptr ;
+		firstBlockDataLength = blockSize - k ;
 		// rest of data to be written in the other blocks 
 		remaining = length - firstBlockDataLength;
 		// need to read blocks if remaining is bigger than 0 
@@ -750,15 +749,15 @@ int ssfs_fread(int fileID, char *buf, int length){
 		
 			char block[length];
 			int z;
-			int pointer = fdt[fileID].readptr;
+			int pointer = fdt[fileID].readptr % 16;
 			
 			memcpy(block, read.bytes + pointer, length);
 			block[length] = '\0';
 			
-			for( z = 0 ; z < length; z++){
+			/*for( z = 0 ; z < length; z++){
 				printf("%c",block[z]);
 			}
-			
+			*/
 			strcpy(buf,block);
 			printf("\n--------------------------------------\n");
 		
@@ -785,7 +784,7 @@ int ssfs_fread(int fileID, char *buf, int length){
 			
 			memcpy(block, read.bytes, dataLength);
 			
-			int n = 1;
+			int n = 0;
 			// now need to write to the completely filled 
 			if (numberOfBlocksToRead > 1){
 				
@@ -814,25 +813,81 @@ int ssfs_fread(int fileID, char *buf, int length){
 			memcpy(block + ((currentBlock - 1 + n) * blockSize) + dataLength,read.bytes, lastDataLength);
 			
 			inodeBlocks[i].inodeSlot[slotIndex].size;
-			fdt[fileID].readptr += length;
 			
 			block[length] = '\0';
 			
 			strcpy(buf,block);
-			
+			fdt[fileID].readptr += length;
 			return length;
-			}
-		
+			}		
 	}
-	
-
 	
 	return -1; 
 }
 
-
-
-
+// remove file from directory entry, release the i-node entry and releasr the data blocks by the file
+int ssfs_remove(char *file){
+	int i,k,p;
+	int inodeIndexFound;
+	int inodeBlock; 
+	int slot;
+	
+	if (strlen(file) < 0){
+		printf("invalid file Too large\n");
+		return -1;
+	}
+	
+	//Delete from root directory and remove inode and free data blocks of the inode
+	
+	for(k = 0; k < 4; k++){
+		for(i = 0; i < 64; i++){
+			if (strcmp(rootDirectory[k].entries[i].name, file) == 0){
+				// found the entry
+				inodeIndexFound = rootDirectory[k].entries[i].inodeIndex;
+				
+				printf("found entry with name : %s with inode : %d\n", file, inodeIndexFound);
+				
+				//delete it from the directory 
+				rootDirectory[k].entries[i].inodeIndex = -1;
+				strcpy(rootDirectory[k].entries[i].name, "root/");
+				
+				inodeBlock = inodeIndexFound / 13;
+				slot = inodeIndexFound % 13;
+				
+				// remove inode and inode files 
+				
+				inode_t removeInode;
+				removeInode.size = -1;
+				for(p = 0 ; p < 14; p++){
+					if (inodeBlocks[inodeBlock].inodeSlot[slot].direct[p] != -1){
+						setFBMbit(inodeBlocks[inodeBlock].inodeSlot[slot].direct[p]);
+						}
+						removeInode.direct[p] = -1;
+				}
+				
+			// set the inode slot to be free 
+			inodeBlocks[inodeBlock].inodeSlot[slot] = removeInode;
+							
+			//close file if open 
+			
+			for(i = 0; i < numberOfInodes; i++){
+				if (fdt[i].inode == inodeIndexFound){
+					fdt[i].inode = -1;
+					fdt[i].free = -1;
+					fdt[i].rwptr = 0;
+					fdt[i].readptr = 0;
+				}
+			}
+			printf("successfully deleted entry\n");
+			return 0;
+			}
+		}
+	}
+	
+	
+	printf("There is no file in the root directories\n");
+	return -1;
+}
 
 int main(){
 	int i,k,p;
@@ -841,8 +896,7 @@ int main(){
 	char * buffer1 = "THE 30 MAN SLAYER";
 	char * buffer2 = "GUTS";
 	int length = strlen(buffer);
-	
-	
+		
 	char *name = "ArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCs";
 	char *name1 = "BrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBs";
 	//mkssfs(4);
@@ -850,21 +904,10 @@ int main(){
 
 	printf("\n");
 
-
-	
-	//displayJnodeIndex();
-	
-	//displayFBM();
-	//displayInodeBlocks();
-	
 	createFile("cake");
 	createFile("portal");
 	createFile("Catherine");
 	createFile("PERSONA");
-	
-	
-
-
 	
 	//displayRootDirectoryEntries();
 
@@ -894,21 +937,50 @@ int main(){
 	ssfs_fwrite(fileID, buffer, length);
 	
 	ssfs_fwrite(fileID, name, strlen(name));
+	
+	printf("\n---------------------------------------------------------\n");
+	
+	ssfs_remove("cake");
+
+	printf("\n---------------------------------------------------------\n");
+	
+	//displayJnodeIndex();
+	
+	displayFBM();
+	displayInodeBlocks();
+	
+	ssfs_fopen("2b");
+	
+	
 	//ssfs_fwrite(fileID, buffer1, strlen(buffer1));
 	//ssfs_fwrite(fileID, buffer, length);
 	//ssfs_fwrite(fileID, buffer2, strlen(buffer2));
 	
+	/*
 	printf("\n---------------------------------------------------------\n");
 	char *rd = (char*) malloc(blockSize * 16);
 	
-	ssfs_fread(fileID,rd,blockSize*2 + 100);
+	ssfs_fread(fileID,rd,blockSize);
 	//ssfs_fread(fileID,rd, 15);
 	printf("read : %s length : %zu\n",rd,strlen(rd));
-
-	//ssfs_fread(fileID,rd, 10);
-	//printf("read :%s length : %zu\n",rd,strlen(rd));
-	free(rd);
+	printf("\n---------------------------------------------------------\n");
 	
+	
+	ssfs_fread(fileID,rd, 10);
+	printf("read :%s length : %zu\n",rd,strlen(rd));
+	
+	printf("\n---------------------------------------------------------\n");
+	
+	ssfs_fread(fileID,rd,blockSize);	
+	printf("read :%s length : %zu\n",rd,strlen(rd));
+	
+	printf("\n---------------------------------------------------------\n");
+	
+	ssfs_fread(fileID,rd,300);	
+	printf("read :%s length : %zu\n",rd,strlen(rd));
+	
+	free(rd);
+  
 	//ssfs_fwrite(2, buffer1, strlen(buffer1));
 	//ssfs_fwrite(3, buffer, length);
 	//ssfs_fwrite(4, buffer2, strlen(buffer2));
@@ -923,7 +995,7 @@ int main(){
 		
 	//displayFDT();
 	
-	/*
+	
 	unsigned char b[1024];
 	read_blocks(19,1,b);
 	
