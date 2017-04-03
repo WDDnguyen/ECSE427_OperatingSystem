@@ -351,7 +351,6 @@ int findEntry(char *name){
 	return -1;
 }
 
-
 int ssfs_fopen(char *name){
 	int i;
 	int inodeIndex;
@@ -369,14 +368,16 @@ int ssfs_fopen(char *name){
 		inodeIndex = findEntry(name); 
 	}
 	
-	int block = fdt[i].inode/16; 
-	int slotIndex = fdt[i].inode % 16;
+	int block = fdt[i].inode/13; 
+	int slotIndex = fdt[i].inode % 13;
 	int size = inodeBlocks[block].inodeSlot[slotIndex].size;
 	
 	//check if fdt already has a file open, if so return index of fdt  * maybe change
 	for(i = 0; i < numberOfInodes;i++){
 		if(fdt[i].inode == inodeIndex){
-			// need to adjust write pointer to last written file  
+			// need to adjust write pointer to last written file  when open    
+			
+			// NEED TO TEST
 			fdt[i].rwptr = size;
 			fdt[i].readptr = 0;
 			return i;
@@ -391,13 +392,11 @@ int ssfs_fopen(char *name){
 			fdt[i].rwptr = 0;
 			fdt[i].free = 0;
 			// when adidng the file into the fdt   put the write pointer to the last given ifle 
-			fdt[i].rwptr = size;
+			//fdt[i].rwptr = size;
 			
 			return i;
 		}
 	}
-	
-	return -1;
 	
 }
 
@@ -412,7 +411,7 @@ int ssfs_close(int fileID){
 	
 	//if file ID is not open 
 	if (fdt[fileID].free == -1){
-		printf("fdt location is free");
+		printf("fdt location is free\n");
 		return -1;
 	}
 	
@@ -424,56 +423,6 @@ int ssfs_close(int fileID){
 	fdt[fileID].free = -1;
 	return 0;	
 	
-}
-
-void displayFDT(){
-	int i;
-	// rechange to number of inodes
-	for(i = 0; i < 64; i++){
-		printf("FDT index : %d free : %d write pointer : %d  read pointer : %d inode : %d\n", i, fdt[i].free,fdt[i].rwptr, fdt[i].readptr, fdt[i].inode);
-	}
-}
-
-void displayRootDirectoryEntries(){
-	int i,k;
-	for(k = 0 ; k < 4; k++){
-		for(i = 0; i < numberOfEntries; i++){
-			printf("entry name : %s inode index : %d\n", rootDirectory[0].entries[i].name, rootDirectory[0].entries[i].inodeIndex);
-		}
-	}
-}
-
-void displayJnodeIndex(){
-	int i;
-	for(i = 0; i < 13; i++){
-		printf("J-node block number :%d  at %d\n", sb.root.direct[i], i);
-	}
-}
-
- void displayFBM(){
-	 int i,k;
-	 for (i =0; i < 5; i++){
-		 for (k = 0 ; k < 8; k++){
-			 printf("%u", !!(fbm.bytes[i] & (1 <<k)));
-		 }
-		 printf("\n");
-	 }
- }
-
-void displayInodeBlocks(){
-	int i,k,p;
-	
-	for(i = 0; i <1 ; i++){
-		printf("inode Block : %d\n",i);	 
-	for( k = 0; k < 10; k++){
-			printf("size : %d\n", inodeBlocks[i].inodeSlot[k].size);
-		for(p = 0; p < 2; p++){
-			printf("Directory value : %d\n", inodeBlocks[i].inodeSlot[k].direct[p]);	 
-		}
-		printf("\n");
-	}
- }
- 
 }
 
 int ssfs_frseek(int fileID, int loc){
@@ -583,7 +532,7 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 	// don't need to allocate new data block if enough spac 
 	if (numberOfBlocksToAllocate == 0){
 		
-		printf("ENOUGH PLACE TO CONTAIN DATA\n");
+		//printf("ENOUGH PLACE TO CONTAIN DATA\n");
 		directNumber = currentBlock;  
 		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
 		read_blocks(writeInDataBlock,1, &write);
@@ -628,7 +577,7 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 			for (n = 1; n < numberOfBlocksToAllocate ; n++){
 				
 			writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
-			printf("full block to write buffer : %d\n", writeInDataBlock);
+			//printf("full block to write buffer : %d\n", writeInDataBlock);
 			read_blocks(writeInDataBlock, 1, &write);
 			memcpy(write.bytes, buf +((currentBlock - 1 + n) * blockSize) + dataLength, blockSize);
 			write_blocks(writeInDataBlock, 1, &write);
@@ -643,7 +592,7 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 			
 		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
 		
-		printf("WRITING IN DATA BLOCK : %d\n", writeInDataBlock);
+		//printf("WRITING IN DATA BLOCK : %d\n", writeInDataBlock);
 		//displayInodeBlocks();
 		
 		read_blocks(writeInDataBlock,1, &write);
@@ -858,167 +807,12 @@ int ssfs_remove(char *file){
 					fdt[i].readptr = 0;
 				}
 			}
-			printf("successfully deleted entry\n");
+			//printf("successfully deleted entry\n");
 			return 0;
 			}
 		}
 	}
 	
-	
 	printf("There is no file in the root directories\n");
 	return -1;
-}
-
-int main(){
-	int i,k,p;
-	int fileID = 0;  
-	char * buffer = "BAZUSO"; 
-	char * buffer1 = "THE 30 MAN SLAYER";
-	char * buffer2 = "GUTS";
-	int length = strlen(buffer);
-		
-	char *name = "ArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasArtoriasBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCsCrtoriCs";
-	char *name1 = "BrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBsBrtoriBs";
-	//mkssfs(4);
-	mkssfs(1);
-
-	printf("\n");
-
-	createFile("cake");
-	createFile("portal");
-	createFile("Catherine");
-	createFile("PERSONA");
-	
-	//displayRootDirectoryEntries();
-
-	ssfs_fopen("cake");
-	ssfs_fopen("portal");
-	ssfs_fopen("Catherine");
-	ssfs_fopen("PERSONA");
-	
-	ssfs_fopen("meow");
-	ssfs_fopen("woof");
-	
-	ssfs_close(2);
-	ssfs_close(3);
-	
-	ssfs_fopen("ribbit");
-	ssfs_fopen("rarw");
-	ssfs_fopen("behhhh");
-	
-	ssfs_fopen("meow");
-	ssfs_fopen("woof");
-	
-	printf("\n---------------------------------------------------------\n");
-	
-	//ssfs_fwrite(fileID, buffer1, strlen(buffer1));
-	//ssfs_fwrite(fileID, buffer, length);
-	//ssfs_fwrite(fileID, buffer2, strlen(buffer2));
-	//ssfs_fwrite(fileID, buffer, length);
-	ssfs_fwrite(fileID, name, strlen(name));
-	
-	printf("\n---------------------------------------------------------\n");
-	/*
-	ssfs_remove("cake");
-
-	printf("\n---------------------------------------------------------\n");
-	
-	//displayJnodeIndex();
-	
-	displayFBM();
-	displayInodeBlocks();
-	
-	ssfs_fopen("2b");
-	
-	
-	//ssfs_fwrite(fileID, buffer1, strlen(buffer1));
-	//ssfs_fwrite(fileID, buffer, length);
-	//ssfs_fwrite(fileID, buffer2, strlen(buffer2));
-	
-	/*
-	printf("\n---------------------------------------------------------\n");
-	char *rd = (char*) malloc(blockSize * 16);
-	
-	ssfs_fread(fileID,rd,blockSize);
-	//ssfs_fread(fileID,rd, 15);
-	printf("read : %s length : %zu\n",rd,strlen(rd));
-	printf("\n---------------------------------------------------------\n");
-	
-	
-	ssfs_fread(fileID,rd, 10);
-	printf("read :%s length : %zu\n",rd,strlen(rd));
-	
-	printf("\n---------------------------------------------------------\n");
-	
-	ssfs_fread(fileID,rd,blockSize);	
-	printf("read :%s length : %zu\n",rd,strlen(rd));
-	
-	printf("\n---------------------------------------------------------\n");
-	
-	ssfs_fread(fileID,rd,300);	
-	printf("read :%s length : %zu\n",rd,strlen(rd));
-	
-	free(rd);
-  
-	//ssfs_fwrite(2, buffer1, strlen(buffer1));
-	//ssfs_fwrite(3, buffer, length);
-	//ssfs_fwrite(4, buffer2, strlen(buffer2));
-	//ssfs_fwrite(5, buffer, length);
-	
-	
-	//ssfs_fwrite(6, name, strlen(name));
-	//ssfs_fwrite(7, buffer1, strlen(buffer1));
-	//ssfs_fwrite(8, buffer, length);
-	//ssfs_fwrite(9, buffer2, strlen(buffer2));
-	
-		
-	//displayFDT();
-	
-	
-	unsigned char b[1024];
-	read_blocks(19,1,b);
-	
-	
-	for(i=0; i < 1024; i++){
-		printf("%c",b[i]);
-	}
-	
-	block_t test;
-	
-	printf("\n---------------------------------------------------------\n");
-	
-	
-	read_blocks(17,1,&test);
-	
-	for(i=0; i < 1024; i++){
-		printf("%c",test.bytes[i]);
-	}
-	
-	block_t test;
-	
-	read_blocks(18,1,&test);
-	printf("\n---------------------------------------------------------\n");
-	for(i=0; i < 1024; i++){
-		printf("%c",test.bytes[i]);
-	}
-	read_blocks(19,1,&test);
-	
-	printf("\n---------------------------------------------------------\n");
-	for(i=0; i < 1024; i++){
-		printf("%c",test.bytes[i]);
-	}
-	
-	read_blocks(20,1,&test);
-	
-	printf("\n---------------------------------------------------------\n");
-	for(i=0; i < 1024; i++){
-		printf("%c",test.bytes[i]);
-	}
-	
-	*/
-		
-	//displayFDT();
-	//displayInodeBlocks();
-
-	return 0;
 }
