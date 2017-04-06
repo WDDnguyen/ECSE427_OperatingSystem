@@ -25,13 +25,14 @@ block_t fbm;
 fileDescriptor_t fdt[numberOfInodes];
 inodeBlock_t inodeBlocks[13];
 rootDirectory_t rootDirectory[4];
-
-//cache 
 block_t writeBlock; 
 
+/*
+initialize the inode file to have all free inode size set to -1 and direct and indirect to -1
+Set first inode to be the root Directory with data block 2,3,4,5.
+*/
 void initializeInodeFiles(){
-	int i;
-	int k;
+	int i,k;
 	
 	inode_t tempInode;
 	tempInode.size = -1;
@@ -57,15 +58,19 @@ void initializeInodeFiles(){
 	
 }
 
+/*
+Initialize all 4 data blocks in root directory by creating an empty entry and setting each slot
+with this entry. 
+*/
+
 void initializeRootDirectory(){
-	int i;
-	int k;	
+	int i,k;	
 	
 	directoryEntry_t entry;
 	entry.inodeIndex = -1;
 	strcpy(entry.name,"root/");
 
-	// initialize all entries of root directories to be 0 
+	// initialize all entries of root directories with the empty entry
 	for (k = 0 ; k < 4 ; k++){
 		for (i = 0 ; i < numberOfEntries ; i++){
 			rootDirectory[k].entries[i] = entry;
@@ -73,12 +78,16 @@ void initializeRootDirectory(){
 	}
 }
 
+/*
+Initialize all superblock members 
+*/
 void initializeSuperBlock(){
 	
 	int i;
 	inode_t root;
 	root.size = 13312;
-	// setting the block numbers to check for the root node 
+	
+	// setting the block numbers to check for the root inode 
 	for( i = 0 ; i < 13 ; i++){
 		root.direct[i] = 6 + i;
 	}
@@ -97,166 +106,10 @@ void initializeSuperBlock(){
 	sb.rootDirectoryBlockNumber[3] = 5;
 }
 
-int FBMGetFreeBit(){
-	int i;
-	int k;
-	for (i = 0; i < blockSize; i++){
-		for (k = 0; k < 8 ; k++){
-			if ((fbm.bytes[i] & (1 << k)) == (1 << k)){
-				
-				//printf("Found a free bit at : %d\n", i * 8 + k);
-				// set the bit to 0 
-				fbm.bytes[i] = fbm.bytes[i] ^ (1 << k);
-				return (i * 8 + k); 
-			}
-				
-		}
-	}
-	
-	//printf("No more free bits left \n");
-	return -1; 
-}
 
-void initializeFBM(){
-	int i;
-	for (i = 0 ; i < blockSize; i++){
-		fbm.bytes[i] = 0xFF;
-	}
-	
-	// might need to put to 19
-	for( i = 0 ; i < 18; i++){
-	FBMGetFreeBit();
-	}
-	
-}
-
-int setFBMbit(int blockNumber){
-	int byte = blockNumber / 8;
-	int bit = blockNumber % 8;
-	fbm.bytes[byte] = fbm.bytes[byte] ^ (1 << bit); 
-	//printf("remove block :%d from fbm \n", blockNumber);
-	return 0;
-}
-
-int clearFBMbit(int blockNumber){
-	 int byte = blockNumber / 8;
-	 int bit = blockNumber % 8;
-	 //printf("BYTE CLEAR %d\n", byte);
-	 //printf("BIT TO CLEAR %d\n", bit);
-	 
-	 fbm.bytes[byte] = fbm.bytes[byte] ^ (1 << bit); 
-	 return 0;
-}
-
-
-// NEED TO CHANGE THE BIT AFTER REMOVING 
-int findFreeInodeIndex(){
-	int i,k;
-	int blockNumber;
-	int inodeIndex = -5;
-	
-	//check for all the i-nodes files
-	for (i = 0; i < 13; i++){
-		
-		blockNumber = sb.root.direct[i];
-		//printf("searching this block number :%d at root direct : %d\n", blockNumber, i);
-			
-		for(k = 0; k < 16; k++){
-			//printf("value %d\n",inodeBlockFound.inodeSlot[k].size);
-			if (inodeBlocks[i].inodeSlot[k].size == -1){
-				inodeIndex = i * 16 + k ;
-				return inodeIndex;
-			}	
-		}
-	}
-		
-	return inodeIndex;
-	
-}
-
-
-int rootAddInode(int inodeIndex){
-	int i = inodeIndex / 13;
-	int k;
-	inode_t newInode;
-	
-	for (k = 0 ; k < 14; k++){
-		newInode.direct[k] = -1;
-	}
-	newInode.size = 0;
-	
-	for(k = 0 ; i<16; k++){
-		if (inodeBlocks[i].inodeSlot[k].size == -1){
-			inodeBlocks[i].inodeSlot[k] = newInode;
-			write_blocks(sb.root.direct[i], 1, &inodeBlocks[i]);
-			//printf("added new inode file to j-node direct : %d, inode Block Number : %d, slot : %d,  Inode index : %d\n", i, sb.root.direct[i],k,inodeIndex);
-			return 1;
-		} 
-	}
-return -1;	
-}
-
-
-int createFile(char* fname){
-	// might need to overwrite the index if too many entries
-	int i,k;
-	int freeIndex = findFreeInodeIndex();
-	
-	directoryEntry_t entry;
-	stpcpy(entry.name,fname);
-	entry.inodeIndex = freeIndex;
-	
-	// check if file exist in the root directories 
-	for (k = 0 ; k < 4; k++){
-		for(i = 0 ; i < numberOfEntries ; i++){
-			if( strcmp(rootDirectory[k].entries[i].name, fname) == 0){
-			//	printf("file name : %s exist already in Directory at entry index : %d\n", fname,i);
-				return -1;
-			}
-		}
-	}
-	
-	for (k = 0 ; k < 4 ; k++){
-		for (i = 0; i < numberOfEntries; i++){
-			if (rootDirectory[k].entries[i].inodeIndex == -1){
-				rootDirectory[k].entries[i] = entry;
-				//might have to write to the disk after commit change whenever 
-				write_blocks(sb.rootDirectoryBlockNumber[k],1, &rootDirectory[k]);
-				break;
-			}
-		}
-	}
-	
-	rootAddInode(freeIndex);
-	return 0;
-}
-
-int allocateDataBlock(int inodeIndex){
-	// get j-node block 
-	
-	int i = inodeIndex / 13;
-
-	int slot = inodeIndex % 13;
-	
-	int newBlockNumber = FBMGetFreeBit();
-	int k;
-	
-	//printf("inode Block Index : %d in slot : %d\n", i, slot);
-	
-	for (k = 0; k < 14 ; k++){
-		if(inodeBlocks[i].inodeSlot[slot].direct[k] == -1){
-			inodeBlocks[i].inodeSlot[slot].direct[k] = newBlockNumber;
-			//printf("Allocated data block : %d to inodeBlock[] : %d slot : %d  direct  :%d \n", newBlockNumber, i,slot, k );
-			//Precaution
-			write_blocks(sb.root.direct[i],1, &inodeBlocks[i]);
-			return newBlockNumber;
-		}
-	}
-	return -1;
-	
-}
-
-// initialize file directory  and set all values to free, rwptr to 0 and  no inode values 
+/* 
+initialize file directory and set all values to free, rwptr to 0 and  no inode values. 
+*/
 void initializeFileDescriptorTable() {
 	int i;
 	fileDescriptor_t fd;
@@ -270,6 +123,183 @@ void initializeFileDescriptorTable() {
 
 }
 
+/*
+Find a data block that is free using the FBM 
+*/
+int FBMGetFreeBit(){
+	int i,k;
+	
+	for (i = 0; i < blockSize; i++){
+		for (k = 0; k < 8 ; k++){
+			if ((fbm.bytes[i] & (1 << k)) == (1 << k)){			
+				// set the bit to 0 
+				fbm.bytes[i] = fbm.bytes[i] ^ (1 << k);
+				return (i * 8 + k); 
+			}
+				
+		}
+	}
+	
+	//printf("No more free bits left \n");
+	return -1; 
+}
+
+/*
+Initialize Free bit map by putting all data blocks to 1.
+Set the first 18 bits to be used for the super block,root directory, inode files and FBM
+*/
+void initializeFBM(){
+	int i;
+	for (i = 0 ; i < blockSize; i++){
+		fbm.bytes[i] = 0xFF;
+	}
+	
+	// first 18 blocks are used when initializing 
+	for( i = 0 ; i < 18; i++){
+	FBMGetFreeBit();
+	}
+	
+}
+
+/* 
+set the FBM bit to be the opposite of the current bit for the specific block number to indicate if block number is free.
+*/
+int setFBMbit(int blockNumber){
+	int byte = blockNumber / 8;
+	int bit = blockNumber % 8;
+	fbm.bytes[byte] = fbm.bytes[byte] ^ (1 << bit); 
+	
+	return 0;
+}
+
+/*
+Goes through each direct value of j-node then check the Inode files to look for a free i-node by checking if i-node size is -1.
+return : the inode index between 0 - 199
+*/
+int findFreeInodeIndex(){
+	int i,k;
+	int blockNumber;
+	int inodeIndex = -5;
+	
+	//check for all the i-nodes files
+	for (i = 0; i < 13; i++){
+		blockNumber = sb.root.direct[i];
+			
+		for(k = 0; k < 16; k++){
+			if (inodeBlocks[i].inodeSlot[k].size == -1){
+				inodeIndex = i * 16 + k ;
+				return inodeIndex;
+			}	
+		}
+	}
+		
+	return inodeIndex;
+	
+}
+
+/*
+Add new inode into the free slot of the i-node File
+inodeIndex : inode index to place the new inode in the i-node File
+*/
+int rootAddInode(int inodeIndex){
+	int i = inodeIndex / 13;
+	int k;
+	inode_t newInode;
+	
+	for (k = 0 ; k < 14; k++){
+		newInode.direct[k] = -1;
+	}
+	
+	newInode.size = 0;
+	
+	for(k = 0 ; i<16; k++){
+		if (inodeBlocks[i].inodeSlot[k].size == -1){
+			inodeBlocks[i].inodeSlot[k] = newInode;
+			write_blocks(sb.root.direct[i], 1, &inodeBlocks[i]);
+			return 1;
+		} 
+	}
+return -1;	
+}
+
+/*create a new file by creating a new entry and adding new entry to an available location in the root directory 
+fname : name of the file to be created 
+*/
+int createFile(char* fname){
+	int i,k;
+	int freeIndex = findFreeInodeIndex();
+	
+	directoryEntry_t entry;
+	stpcpy(entry.name,fname);
+	entry.inodeIndex = freeIndex;
+	
+	// check if file exist in the root directories 
+	for (k = 0 ; k < 4; k++){
+		for(i = 0 ; i < numberOfEntries ; i++){
+			if( strcmp(rootDirectory[k].entries[i].name, fname) == 0){
+				printf("file name : %s exist already in Directory at entry index : %d\n", fname,i);
+				return -1;
+			}
+		}
+	}
+	// if doesn't exist, set new entry with name and inode associated to the file
+	for (k = 0 ; k < 4 ; k++){
+		for (i = 0; i < numberOfEntries; i++){
+			if (rootDirectory[k].entries[i].inodeIndex == -1){
+				rootDirectory[k].entries[i] = entry;
+				write_blocks(sb.rootDirectoryBlockNumber[k],1, &rootDirectory[k]);
+				break;
+			}
+		}
+	}
+	
+	rootAddInode(freeIndex);
+	
+	return 0;
+}
+/*
+Allocate a new data block when writing in a file if not enough available bytes to write.
+inodeIndex : allocate new block to the specific i-node and set that block in the i-node direct
+*/
+int allocateDataBlock(int inodeIndex){
+	int i = inodeIndex / 13;
+	int slot = inodeIndex % 13;
+	int newBlockNumber = FBMGetFreeBit();
+	int k,m;
+	
+	for (k = 0; k < 14 ; k++){
+		if(inodeBlocks[i].inodeSlot[slot].direct[k] == -1){
+			inodeBlocks[i].inodeSlot[slot].direct[k] = newBlockNumber;
+			write_blocks(sb.root.direct[i],1, &inodeBlocks[i]);
+			return newBlockNumber;
+		}
+	}
+	
+	// maximum of 74 extra inodes for a single file 
+	for (m = 0; m < 74; m++){
+		// if all the direct data blocks are already allocated then need to check the indirect blocks
+		if (inodeBlocks[i].inodeSlot[slot].indirect == -1){
+			// allocate new i-node index to the indirect
+			// get new free data block by checking the FBM 
+			inodeBlocks[i].inodeSlot[slot].indirect = FBMGetFreeBit();
+			// create new i-node for the file 
+			rootAddInode(inodeBlocks[i].inodeSlot[slot].indirect);
+			// need to create a new inode block that stores this data	
+		}
+		// goes to next indirect i-node 
+		else {
+			i = inodeBlocks[i].inodeSlot[slot].indirect / 13;
+			slot = inodeBlocks[i].inodeSlot[slot].indirect % 13;
+		}
+	}
+	
+	return -1;
+	
+}
+/*
+make a shadow file system
+fresh : if fresh > 0 then initialize the disk else recover persistance values in the disk 
+*/
 void mkssfs(int fresh){
 	int i;
 	initializeFileDescriptorTable();
@@ -283,6 +313,7 @@ void mkssfs(int fresh){
 
 		//create a new file system
 		char* filename = "WDDNGUYEN";
+		
 		init_fresh_disk(filename, blockSize, numberOfBlocks);
 		
 		initializeFileDescriptorTable();
@@ -297,12 +328,10 @@ void mkssfs(int fresh){
 			write_blocks(6 + i, 1, &inodeBlocks[i]);
 		}
 		
-		//printf("DIRECTORY BLOCK NUMBER : %d\n", sb.rootDirectoryBlockNumber[0]);
-		
 	}
-	// FILE SYSTEM ALREADY EXISTED
+	// Shadow file system already exist 
 	else {
-	//printf("ONLY GO HERE IF FRESH = 0 \n");
+	
 	char* filename = "WDDNGUYEN";
 	initializeFileDescriptorTable();
 	init_disk(filename, blockSize, numberOfBlocks);
@@ -320,24 +349,18 @@ void mkssfs(int fresh){
 	for(i = 0; i < 13; i++){
 		read_blocks(sb.root.direct[i], 1 , &inodeBlocks[i]);
 	}
-	
 	}
-	/*
-	printf("--------------------------------------------------------------------\n");
-	printf("Block Size : %d\n", sb.block_size);
-	printf("File System Size : %d\n", sb.fs_size);
-	printf("Number of Inodes : %d\n", sb.Inodes);	
-	printf("SIZE OF SUPER BLOCK : %zu\n", sizeof(superblock_t));
-	printf("SIZE OF INODE : %zu\n", sizeof(inode_t));
-	printf("SIZE OF BLOCK : %zu\n", sizeof(block_t));
-	printf("SIZE OF rootDirectory : %zu\n", sizeof(rootDirectory_t));
-	printf("SIZE OF DIRECTORY ENTRY  : %zu\n", sizeof(directoryEntry_t));
-	printf("SIZE OF INODE Block : %zu\n", sizeof(inodeBlock_t));
-	printf("--------------------------------------------------------------------\n"); */
+ 
 }
 
+/*
+find the entry in the root directory
+name : search for the entry with the file name 
+return : the inode index of the entry 
+*/
 int findEntry(char *name){
 	int i,k;
+	
 	// check if file is already in root directory then add to open file descriptor
 	for (k = 0 ; k < 4; k ++){
 		for (i = 0; i < numberOfEntries ; i++){
@@ -346,17 +369,21 @@ int findEntry(char *name){
 				return -1;
 			} 
 			if (strcmp(rootDirectory[k].entries[i].name, name) == 0){
-				//printf("Found the entry : %s with inode Index : %d\n", name, rootDirectory[0].entries[i].inodeIndex);
 				return rootDirectory[k].entries[i].inodeIndex;
 			}		
 		}
 	}
 	return -1;
 }
-
+/*
+Open a file by checking if file exist in the root directory and place the file in a file descriptor table when writing/reading
+if file doesn't exist, create a new file, add into the root directory then place the file in the file descriptor table. 
+name : name of the file to open .
+return : file descriptor index
+*/
 int ssfs_fopen(char *name){
 	int i;
-	int inodeIndex;
+	int inodeIndex = -1;
 	
 	//file name too big 
 	if (strlen(name) > 10){
@@ -369,10 +396,13 @@ int ssfs_fopen(char *name){
 	if(inodeIndex == -1){
 		createFile(name);
 		inodeIndex = findEntry(name); 
+		if (inodeIndex == -1){
+			printf("ERROR : ROOT DIRECTORY FULL\n");
+			return -1;
+		}
 	}
 	
-	
-	//check if fdt already has a file open, if so return index of fdt  * maybe change
+	//check if fdt already has a file open
 	for(i = 0; i < numberOfInodes;i++){
 		if(fdt[i].inode == inodeIndex){
 			// need to adjust write pointer to last written file  when open    
@@ -382,25 +412,19 @@ int ssfs_fopen(char *name){
 			int slotIndex = fdt[i].inode % 13;
 			int size = inodeBlocks[block].inodeSlot[slotIndex].size;
 			
-			// NEED TO TEST
-			//printf("GOing here\n");
 			fdt[i].rwptr = size;
 			fdt[i].readptr = 0;
 			return i;
 		}
 	}
 	
-	//check for free space in fdt and add inode index to the table if so  
+	//check for free space in fdt and add inode index to the table
 	for(i = 0; i < numberOfInodes; i++){
 		if(fdt[i].free == -1 ){
-			//printf("There is enough free space\n");
 			fdt[i].inode = inodeIndex;
 			fdt[i].rwptr = 0;
 			fdt[i].free = 0;
 			fdt[i].readptr = 0;
-			// when adidng the file into the fdt   put the write pointer to the last given ifle 
-			//fdt[i].rwptr = size;
-			
 			return i;
 		}
 	}
@@ -408,6 +432,11 @@ int ssfs_fopen(char *name){
 	return -1;
 	
 }
+/*
+Close the file descriptor table
+fileID : the index of the file descriptor table
+  
+*/
 
 int ssfs_fclose(int fileID){
 
@@ -424,7 +453,7 @@ int ssfs_fclose(int fileID){
 	}
 	
 	// remove fdt open file
-	//printf("close file ID : %d with inode : %d\n",fileID,fdt[fileID].inode);
+	
 	fdt[fileID].inode = -1;
 	fdt[fileID].rwptr = 0;
 	fdt[fileID].readptr = 0;
@@ -433,6 +462,11 @@ int ssfs_fclose(int fileID){
 	
 }
 
+/*
+seek the read pointer of the file descriptor table to the specific byte location
+fileID : file descriptor table index
+loc : byte location for read pointer to be placed.
+*/
 int ssfs_frseek(int fileID, int loc){
 	// check if fileID is valid
 	
@@ -455,8 +489,9 @@ int ssfs_frseek(int fileID, int loc){
 	int block = fdt[fileID].inode / 13;
 	int slot = fdt[fileID].inode % 13;
 	int size = inodeBlocks[block].inodeSlot[slot].size;
+	
+	// location can't be bigger than size 
 	if(loc > size){
-		//printf("pointer value : %d  size of file to read : %d\n",loc , size);
 		return -1;
 	}
 	
@@ -464,6 +499,12 @@ int ssfs_frseek(int fileID, int loc){
 	return 0;
 	
 }
+
+/*
+seek the write pointer of the file descriptor table to the specific byte location
+fileID : file descriptor table index
+loc : byte location for write pointer to be placed.
+*/
 
 int ssfs_fwseek(int fileID, int loc){
 	
@@ -489,7 +530,6 @@ int ssfs_fwseek(int fileID, int loc){
 	int slot = fdt[fileID].inode % 13;
 	int size = inodeBlocks[block].inodeSlot[slot].size;
 	if(loc > size){
-		//printf("pointer value : %d  size of file to write : %d\n", loc, size);
 		return -1;
 	}
 	
@@ -497,10 +537,23 @@ int ssfs_fwseek(int fileID, int loc){
 	return 0;
 	
 	
-}
 
-// error checking needed 
+	}
+/*
+writing inside the data blocks of a file
+if file is new, allocate a data block
+fileID: file in the open descriptor table
+buf : buffer to write from 
+length : number of bytes to write 
+return : length written
+*/
+
 int ssfs_fwrite(int fileID, char *buf, int length){
+	
+	if(fileID < 0 || fileID >= numberOfInodes){
+		//printf("invalid fileID\n");
+		return -1;
+	}
 	
 	// verify if file ID exist 
 	if (fdt[fileID].inode == -1){
@@ -509,30 +562,49 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 	}
 	
 	int inodeIndex = fdt[fileID].inode;
-	//printf("inodeIndex : %d\n", inodeIndex);
 	int i = inodeIndex / 13;
 	int slotIndex = inodeIndex % 13;
 	int size = inodeBlocks[i].inodeSlot[slotIndex].size;
-	//printf("Write pointer currently at : %d  length to write : %d\n",fdt[fileID].rwptr,length);
-	//printf("Inode size: %d   size in write fct :%d\n",inodeBlocks[i].inodeSlot[slotIndex].size,size);
-	
 	int writeInDataBlock;
-	int directNumber;	
+	
 	// char to start writting from in a data block 
 	int k = fdt[fileID].rwptr % 1024;
-	int currentBlock;
+	int currentBlock = 0;
 	int p;
 
 	block_t write;	
 		
 	//check which block in the inode where the pointer is currently at 
 	currentBlock = fdt[fileID].rwptr / blockSize;
+
+	// if the block is > 14 than need to search through the indirect of the i-nodes	
+	int m;
+	int nextInodeOfFile = i;
+	int nextSlot = slotIndex;
+	int nextDirect = i;
+	//printf("CURRENT BLOCK :%d\n", currentBlock);
+	if (currentBlock >= 14){
+		 nextInodeOfFile = currentBlock / 14; 
+		 
+		 // get to the last inode of the file 
+		 for(m = 0; m < nextInodeOfFile; m++){
+			nextInodeOfFile = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect / 13;
+			nextSlot = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect % 13;
+		 }
+		 
+		 // find the last direct block written in 
+		 for(m = 0 ; m < 14; m++){
+			 if (inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[m] == -1){
+				 nextDirect = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[m - 1];
+			 }
+		 }
+	}
 	
 	int totalWritingSize = fdt[fileID].rwptr + length;		
 	int remaining = 0;
 	int numberOfBlocksToAllocate = 0;
-	int firstBlockDataLength;
-	int lastBlockDataLength;
+	int firstBlockDataLength = 0;
+	int lastBlockDataLength = 0;
 	
 	// check if file is going to overflow to another data block
 	if (totalWritingSize > (currentBlock + 1) * blockSize){
@@ -548,16 +620,9 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 		}
 	}
 	
-	if (totalWritingSize >= 14 * blockSize + 1){
-		printf("Cannot write more than 14 blocks to the inode\n");
-		return -1;
-	}
-	
 	// If new file then allocate atleast 1 block 
 	if(size == 0){
-		//printf("New file\n");
 		allocateDataBlock(inodeIndex);
-		// testing to set size to 0 
 		inodeBlocks[i].inodeSlot[slotIndex].size = 0;
 		fdt[fileID].rwptr = 0;
 	}
@@ -565,39 +630,24 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 	// don't need to allocate new data block if enough space
 	if (numberOfBlocksToAllocate == 0){
 		
-		//printf("Inode size: %d   totalWritingSize :%d\n",inodeBlocks[i].inodeSlot[slotIndex].size,totalWritingSize);
+		writeInDataBlock = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[nextDirect];
+		read_blocks(writeInDataBlock,1, &write);
+		memcpy(write.bytes + k,buf,length);
+		write_blocks(writeInDataBlock, 1, &write);
 		inodeBlocks[i].inodeSlot[slotIndex].size = totalWritingSize;
 		fdt[fileID].rwptr += length;
-	
-		//printf("ENOUGH PLACE TO CONTAIN DATA\n");
-		directNumber = currentBlock;  
-		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
-		read_blocks(writeInDataBlock,1, &write);
-		
-		memcpy(write.bytes + k,buf,length);
-		
-		//printf("EXISTING FILE WRITE IN DATA BLOCK : %d\n", writeInDataBlock);
-		
-		write_blocks(writeInDataBlock, 1, &write);
 	
 		return length;
 	}
 	
 	else {
-		//printf("Not going here for the test\n");
-		//printf("NUMBER OF BLOCKS TO ALLOCATE DATA : %d\n", numberOfBlocksToAllocate);
-		// need to allocate more blocks if the length of the write is going to be a lot 
 		
+		// need to allocate more blocks if the length of the write is going to be a lot 	
 		for(p = 0; p < numberOfBlocksToAllocate ; p++){
 			allocateDataBlock(inodeIndex);
 		}
 				
-		//search last block written 
-		//directNumber = fdt[fileID].rwptr / blockSize;
-		directNumber = currentBlock;
-		
-		//printf("THIS HAS TO BE %d\n", currentBlock);
-		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
+		writeInDataBlock = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[nextDirect];
 		read_blocks(writeInDataBlock,1, &write);
 		
 		// start by writing to the current block;
@@ -605,48 +655,67 @@ int ssfs_fwrite(int fileID, char *buf, int length){
 		k = size % 1024;
 		memcpy(write.bytes + k, buf, dataLength);
 		write_blocks(writeInDataBlock, 1, &write);
-		
+		// might have to write the inode block back
 		int n = 0;
+		
+		// need to go to next inode  if next data block to write is after direct[14] 
+		if ((nextDirect + n) > 14){
+			nextInodeOfFile =  inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect / 13;
+			nextSlot = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect % 13;
+			nextDirect = 0;
+		}
+		
 		// now need to write to the completely filled 
 		if (numberOfBlocksToAllocate > 1){
 			
 			for (n = 1; n < numberOfBlocksToAllocate ; n++){
+				nextDirect += 1;
+				// need to go to next inode if next data block to write after direct[14]
+				if (nextDirect > 14){
+					nextInodeOfFile =  inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect / 13;
+					nextSlot = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect % 13;
+					nextDirect = 0;
+				}
 				
-			writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
-			//printf("full block to write buffer : %d\n", writeInDataBlock);
-			read_blocks(writeInDataBlock, 1, &write);
-			memcpy(write.bytes, buf +((currentBlock - 1 + n) * blockSize) + dataLength, blockSize);
-			write_blocks(writeInDataBlock, 1, &write);
-									 
+				writeInDataBlock = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[nextDirect];
+				read_blocks(writeInDataBlock, 1, &write);
+				memcpy(write.bytes, buf +((currentBlock - 1 + n) * blockSize) + dataLength, blockSize);
+				write_blocks(writeInDataBlock, 1, &write);
+				
 			}
 			
 		}
-		//printf("CURRENT BLOCK : %d\n", currentBlock);
 		
 		// write to the last block  and update pointer 
-		int lastDataLength = lastBlockDataLength;
-			
-		writeInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
-		
-		//printf("WRITING IN DATA BLOCK : %d\n", writeInDataBlock);
-		//displayInodeBlocks();
-		
+		int lastDataLength = lastBlockDataLength;	
+		writeInDataBlock = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[nextDirect + 1];
 		read_blocks(writeInDataBlock,1, &write);
-		
 		memcpy(&(write.bytes), buf + ((currentBlock - 1 + n) * blockSize) + dataLength, lastDataLength);
 		write_blocks(writeInDataBlock, 1, &write);
-		printf("totalSize of writing : %d\n");
 		inodeBlocks[i].inodeSlot[slotIndex].size = totalWritingSize;
 		fdt[fileID].rwptr += length;
-		
+		// might have to write the inode block back
 		return length;
 		}		
 	return -1;
 }
 
+/*
+Read inside the data blocks of a file
+fileID: file in the open descriptor table
+buf : buffer to write from 
+length : number of bytes to write 
+return : length written
+*/
+
 int ssfs_fread(int fileID, char *buf, int length){
 	
 	// verify if file ID exist 
+	if(fileID < 0 || fileID >= numberOfInodes){
+		//printf("invalid fileID\n");
+		return -1;
+	}
+	
 	if (fdt[fileID].inode == -1){
 		//printf("ERROR : Not valid file ID\n");
 		return -1;
@@ -664,19 +733,42 @@ int ssfs_fread(int fileID, char *buf, int length){
 	
 	// char to start writting from in a data block 
 	int k = fdt[fileID].readptr % 1024;
-	int currentBlock;
+	int currentBlock = 0;
 
 	block_t read;	
 	
-	//check which block in the inode where the pointer is currently at 
-	//printf("READ POINTER CURRENTLY AT :%d\n", fdt[fileID].readptr);
 	currentBlock = fdt[fileID].readptr / blockSize;
+	
+	// if the block is > 14 than need to search through the indirect of the inodes	
+	
+	int m;
+	int nextInodeOfFile = i;
+	int nextSlot = slotIndex;
+	int nextDirect = i;
+	
+	
+	if (currentBlock >= 14){
+		 nextInodeOfFile = currentBlock / 14; 
+		 
+		 // get to the last inode of the file 
+		 for(m = 0; m < nextInodeOfFile; m++){
+			nextInodeOfFile = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect / 13;
+			nextSlot = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect % 13;
+		 }
+		 
+		 // find the last direct block written in 
+		 for(m = 0 ; m < 14; m++){
+			 if (inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[m] == -1){
+				 nextDirect = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[m - 1];
+			 }
+		 }
+	}
 	
 	int totalReadSize = fdt[fileID].readptr + length;		
 	int remaining = 0;
 	int numberOfBlocksToRead = 0;
-	int firstBlockDataLength;
-	int lastBlockDataLength;
+	int firstBlockDataLength = 0;
+	int lastBlockDataLength = 0;
 	
 	// check if file is going to overflow 
 	if (totalReadSize > (currentBlock + 1) * blockSize){
@@ -693,17 +785,17 @@ int ssfs_fread(int fileID, char *buf, int length){
 	}
 	
 	//If the read is much bigger than the size of the block   
-	if(size < totalReadSize ){
-		//printf("read length is more than size\n");
+	/*if(size < totalReadSize ){
+		printf("read length is more than size\n");
 		return -1;	
-	}
+	}*/
 	else {
 	
 		// don't need to allocate new data block if enough space in the block  
 		if (numberOfBlocksToRead == 0){
 			//printf("ENOUGH PLACE TO READ DATA\n");
 			directNumber = currentBlock;  
-			readInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
+			readInDataBlock = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[nextDirect];
 			
 			read_blocks(readInDataBlock,1, &read);
 
@@ -728,9 +820,7 @@ int ssfs_fread(int fileID, char *buf, int length){
 			printf("NEVER GO HERE FOR THIS TEST\n");
 			//printf("NUMBER OF BLOCKS TO READ : %d\n", numberOfBlocksToRead);
 			 
-			directNumber = currentBlock;
-			
-			readInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[directNumber];
+			readInDataBlock = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[nextDirect];
 			read_blocks(readInDataBlock,1, &read);
 			
 			// start by writing to the current block;
@@ -742,13 +832,29 @@ int ssfs_fread(int fileID, char *buf, int length){
 			
 			memcpy(block, read.bytes, dataLength);
 			
-			int n = 0;
+			int n = 1;
+			
+			if ((nextDirect + n) > 14){
+				nextInodeOfFile =  inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect / 13;
+				nextSlot = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect % 13;
+				nextDirect = 0;
+			}
+					
 			// now need to write to the completely filled 
 			if (numberOfBlocksToRead > 1){
 				
 				for (n = 1; n < numberOfBlocksToRead ; n++){
 					
-				readInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
+				nextDirect += 1;
+				
+					// need to go to next inode if next data block to write after direct[14]
+				if (nextDirect > 14){
+					nextInodeOfFile =  inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect / 13;
+					nextSlot = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].indirect % 13;
+					nextDirect = 0;
+				}
+				
+				readInDataBlock = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[nextDirect];
 				//printf("full block to READ buffer : %d\n", readInDataBlock);
 				read_blocks(readInDataBlock, 1, &read);
 				
@@ -761,7 +867,7 @@ int ssfs_fread(int fileID, char *buf, int length){
 			// read the last block  and update pointer 
 			int lastDataLength = lastBlockDataLength;
 				
-			readInDataBlock = inodeBlocks[i].inodeSlot[slotIndex].direct[currentBlock + n];
+			readInDataBlock = inodeBlocks[nextInodeOfFile].inodeSlot[nextSlot].direct[nextDirect + 1];
 			
 			//printf("Read IN DATA BLOCK : %d\n", readInDataBlock);
 			//displayInodeBlocks();
@@ -783,7 +889,9 @@ int ssfs_fread(int fileID, char *buf, int length){
 	return -1; 
 }
 
-// remove file from directory entry, release the i-node entry and releasr the data blocks by the file
+/*
+remove file from directory entry, release the i-node entry and releasr the data blocks by the file
+*/ 
 int ssfs_remove(char *file){
 	int i,k,p;
 	int inodeIndexFound;
@@ -796,14 +904,17 @@ int ssfs_remove(char *file){
 	}
 	
 	//Delete from root directory and remove inode and free data blocks of the inode
-	
 	for(k = 0; k < 4; k++){
 		for(i = 0; i < 64; i++){
+			
+			//can only remove 
+			if (k * 64 + i > 200){
+				return -1;
+			}
+			
 			if (strcmp(rootDirectory[k].entries[i].name, file) == 0){
 				// found the entry
 				inodeIndexFound = rootDirectory[k].entries[i].inodeIndex;
-				
-				//printf("found entry with name : %s with inode : %d\n", file, inodeIndexFound);
 				
 				//delete it from the directory 
 				rootDirectory[k].entries[i].inodeIndex = -1;

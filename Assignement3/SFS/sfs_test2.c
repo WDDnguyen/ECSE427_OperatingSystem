@@ -22,12 +22,12 @@ int difficult_test(){
   test_persistence(&err_no, 512);
   test_persistence(&err_no, 1024);
   mkssfs(1);                     /* Initialize the file system. */
+  /*
   //Attemping to crash the system with overflowing fopens
   //This function will remove all files after it's done.
- // test_overflow_open(file_id, file_size, write_ptr, file_names, write_buf, ABS_CAP_FD, &err_no);
+  test_overflow_open(file_id, file_size, write_ptr, file_names, write_buf, ABS_CAP_FD, &err_no);
   //So we have to open new files. 
-  //test_open_new_files(file_names, file_id, num_file, &err_no);
-  /*
+  test_open_new_files(file_names, file_id, num_file, &err_no);
   //Heavy write into the file system
   for(int i = 0; i < iterations; i++){
       res = test_difficult_write_files(file_id, file_size, write_ptr, write_buf, num_file, &err_no);
