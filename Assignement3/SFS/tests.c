@@ -442,7 +442,7 @@ int test_write_to_overflow(int *file_id, int *file_size, char **write_buf, int i
     if(res < 0)
           fprintf(stderr, "Warning: ssfs_frseek returned negative. Potential frseek fail?\n");
     read_length = strlen(buffer[i]);
-    if(ssfs_fread(index, read_buffer, read_length) < 0){
+    if(ssfs_fread(file_id[index], read_buffer, read_length) < 0){
         fprintf(stderr, "Error: Read Failed. \n");
         *err_no += 1;
     }else if(read_length != strlen(read_buffer)){

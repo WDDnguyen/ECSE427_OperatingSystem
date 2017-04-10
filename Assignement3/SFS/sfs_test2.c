@@ -22,7 +22,6 @@ int difficult_test(){
   test_persistence(&err_no, 512);
   test_persistence(&err_no, 1024);
   mkssfs(1);                     /* Initialize the file system. */
-  /*
   //Attemping to crash the system with overflowing fopens
   //This function will remove all files after it's done.
   test_overflow_open(file_id, file_size, write_ptr, file_names, write_buf, ABS_CAP_FD, &err_no);
@@ -82,7 +81,6 @@ int difficult_test(){
   test_remove_files(file_id, file_size, write_ptr, file_names, write_buf, num_file, &err_no);
   //So at this point, there should be no files live. 
   //final round
-  */
   printf("\n-------------------------------\nDifficult test Finished.\nCurrent Error Num: %d\n--------------------------------\n\n", err_no);
   free_name_element(file_names, num_file);
   free(file_size);
