@@ -1,5 +1,8 @@
-#McGill ECSE 427 Operating System
-Assignements for ECSE 427 Winter 2017 semester. <br> 
-Assignement 1 : Create a Shell command prompt similar to Linux <br>
-Assignement 2 : Create a Shared Memory Key-Value Store <br>
-Assignement 3 : Create a simple Shadow File System with a disk emulator <br> 
+# McGill ECSE 427 Operating System Winter 2017
+Code and documents of assignements are place in their respective directories for anyone to use as reference.
+All assignements are written in C and tested on Linux.
+
+### Assignement
+- Assignement 1 : Created a Shell similar to Linux terminal with commands such as : ls, cd, pwd, bg, fg with redirection and pipelining of 2 commands.
+- Assignement 2 : Programmed a Shared Memory Key-Value Store using semaphores.
+- Assignement 3 : Programmed a Simple Shadow File System with a disk emulator to create and manipulate files in the disk emulator. 
